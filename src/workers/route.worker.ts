@@ -25,13 +25,14 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
         speedKmh: derived.speedKmh,
         lowConf: derived.lowConf,
         spike: derived.spike,
+        inStop: derived.inStop,
         stops: derived.stops,
         metrics,
         preview: previewLine(route, metrics.trim.startIdx, metrics.trim.endIdx),
       };
       post({ kind: 'analyzed', reqId: msg.reqId, result }, [
         route.lat.buffer, route.lon.buffer, route.ele.buffer, route.time.buffer, route.sat.buffer,
-        derived.cum.buffer, derived.speedKmh.buffer, derived.lowConf.buffer, derived.spike.buffer,
+        derived.cum.buffer, derived.speedKmh.buffer, derived.lowConf.buffer, derived.spike.buffer, derived.inStop.buffer,
       ]);
     }
   } catch (e) {

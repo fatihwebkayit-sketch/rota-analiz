@@ -10,6 +10,7 @@ export interface AnalysisResult {
   speedKmh: Float64Array;
   lowConf: Uint8Array;
   spike: Uint8Array;
+  inStop: Uint8Array;
   stops: Stop[];
   metrics: RouteMetrics;
   preview: [number, number][];

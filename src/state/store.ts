@@ -99,17 +99,24 @@ export const useApp = create<AppState>((set, get) => ({
 
   async chooseFolder() {
     let h: FileSystemDirectoryHandle;
+    const old = get().folderHandle;
+    const oldGranted = get().folderState === 'granted';
     try {
       h = await folder.pickFolder();
     } catch (e) {
       const err = e as Error;
       console.warn('Klasör seçimi hatası', err?.name, err?.message);
-      if (err?.name === 'AbortError') get().toast(`Klasör seçilmedi (Chrome: “${err.message}”).`, 'error');
+      if (err?.name === 'AbortError') get().toast(`Klasör seçilmedi (tarayıcı yanıtı: “${err.message}”).`, 'error');
       else get().toast(`Klasör seçilemedi (${err?.name ?? 'hata'}): ${err?.message ?? err}`, 'error');
       return;
     }
+    // Klasör değişiyorsa mevcut kayıtlar yeni klasöre kopyalanır (eski klasör olduğu gibi kalır)
+    if (old && !(await (old as any).isSameEntry?.(h).catch(() => false))) {
+      await repo.prepareFolderChange(oldGranted ? old : undefined);
+    }
     const st = await folder.folderState(h);
     set({ folderHandle: h, folderState: st });
+    if (st === 'prompt' && get().folderSetupSeen) get().toast('Yeni klasör seçildi. Kaydetme izni için sağ üstteki turuncu “Klasör erişimini yenile” düğmesine basın.');
     if (st === 'granted') {
       set({ folderSetupSeen: true });
       savePref('folderSetupSeen', true);
@@ -128,7 +135,7 @@ export const useApp = create<AppState>((set, get) => ({
         savePref('folderSetupSeen', true);
         await get().syncFolder();
         get().toast(`Veri klasörü bağlandı: ${h.name}`);
-      } else get().toast(`Düzenleme izni verilmedi (Chrome yanıtı: ${res}).`, 'error');
+      } else get().toast(`Düzenleme izni verilmedi (tarayıcı yanıtı: ${res}).`, 'error');
     } catch (e) {
       const err = e as Error;
       get().toast(`Düzenleme izni istenemedi (${err?.name}: ${err?.message}).`, 'error');

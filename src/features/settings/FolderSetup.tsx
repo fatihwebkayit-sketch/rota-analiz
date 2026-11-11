@@ -12,9 +12,9 @@ export function FolderSetup() {
           <div className="ra-label">Adım 2 / 2</div>
           <h2 className="mt-1 text-[15px] font-semibold">Klasöre kaydetme izni</h2>
           <p className="mt-2 text-[12.5px] leading-relaxed text-fg-muted">
-            Seçilen klasör: <span className="font-mono text-fg">{folderHandle.name}</span>. Rotaları bu klasöre kaydedebilmek için Chrome'un düzenleme iznine ihtiyaç var.
+            Seçilen klasör: <span className="font-mono text-fg">{folderHandle.name}</span>. Rotaları bu klasöre kaydedebilmek için tarayıcının düzenleme iznine ihtiyaç var.
           </p>
-          <p className="mt-2 text-[12px] text-fg-muted">Aşağıdaki düğmeye basınca Chrome bir izin penceresi açar; <span className="text-fg">Dosyaları düzenle</span> (veya <span className="text-fg">Her ziyarette izin ver</span>) seçin.</p>
+          <p className="mt-2 text-[12px] text-fg-muted">Aşağıdaki düğmeye basınca tarayıcı bir izin penceresi açar; <span className="text-fg">Dosyaları düzenle</span> (veya <span className="text-fg">Her ziyarette izin ver</span>) seçin.</p>
           <div className="mt-5 flex justify-end gap-2">
             <button className="ra-btn" onClick={chooseFolder}>Başka klasör seç</button>
             <button className="ra-btn-primary" onClick={grantFolder}>Düzenleme izni ver</button>
@@ -32,9 +32,9 @@ export function FolderSetup() {
         <ol className="mt-3 list-decimal space-y-1 pl-5 text-[12px] text-fg-muted">
           <li>“Veri klasörü seç” düğmesine basın.</li>
           <li>Açılan pencerede Google Drive'a (<span className="text-fg">G:</span>) gidin, <span className="text-fg">Drive'ım</span> içinde <span className="text-fg">Rotalarım</span> adında yeni klasör oluşturun, içine girip <span className="text-fg">Klasör seç</span>'e basın.</li>
-          <li>Chrome düzenleme izni sorduğunda <span className="text-fg">Dosyaları düzenle</span>'yi onaylayın.</li>
+          <li>Tarayıcı izin sorduğunda önce görüntüleme, sonra düzenleme iznini onaylayın: <span className="text-fg">Dosyaları düzenle</span>'yi onaylayın.</li>
         </ol>
-        <p className="mt-2 text-[11.5px] text-fg-faint">Sürücünün kendisini (G:\) seçmeyin; Chrome sürücü köklerine izin vermez. Ofis bilgisayarında aynı klasörü seçtiğinizde kayıtlarınız orada da görünür.{records.length ? ` Bu tarayıcıdaki ${records.length} kayıt klasöre taşınır.` : ''}</p>
+        <p className="mt-2 text-[11.5px] text-fg-faint">Sürücünün kendisini (G:\) seçmeyin; Tarayıcılar sürücü köklerine izin vermez. Ofis bilgisayarında aynı klasörü seçtiğinizde kayıtlarınız orada da görünür.{records.length ? ` Bu tarayıcıdaki ${records.length} kayıt klasöre taşınır.` : ''}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button className="ra-btn" onClick={dismissFolderSetup}>{tr.folder.later}</button>
           <button className="ra-btn-primary" onClick={chooseFolder}>{tr.actions.chooseFolder}</button>

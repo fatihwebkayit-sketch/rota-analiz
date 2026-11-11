@@ -48,7 +48,7 @@ export const tr = {
     connected: 'Veri klasörü',
     notConnected: 'Klasör bağlı değil · veriler yalnızca bu tarayıcıda',
     needsPermission: 'Klasör erişimi için onay gerekiyor',
-    unsupported: 'Bu tarayıcı klasöre kaydetmeyi desteklemiyor. Veriler tarayıcıda saklanır; düzenli yedek alın.',
+    unsupported: 'Bu tarayıcı klasöre kaydetmeyi desteklemiyor (Edge veya Chrome gerekir). Veriler tarayıcıda saklanır; düzenli yedek alın.',
     later: 'Şimdilik tarayıcıda sakla',
     scanned: (n: number) => `Klasörden ${n} yeni kayıt alındı`,
   },

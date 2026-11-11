@@ -42,6 +42,7 @@ body { font-size: 13px; -webkit-font-smoothing: antialiased; overflow: hidden; }
 .ra-marker { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #131415; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.85); }
 .ra-start { background: #5fb57f; }
 .ra-end { background: #e2614f; }
+.ra-selmarker { width: 20px; height: 20px; border-radius: 50%; background: #ffd28a; color: #131415; font: 600 11px/20px 'Inter Variable', sans-serif; text-align: center; border: 2px solid #131415; box-shadow: 0 0 0 1.5px #ffd28a; }
 
 /* MapLibre atıf kutusu koyu tema */
 .maplibregl-ctrl-attrib.maplibregl-compact { background: rgba(19,20,21,0.8); color: #9a9ca1; }

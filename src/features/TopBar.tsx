@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/store';
 import { tr } from '../i18n/tr';
 
@@ -57,19 +57,21 @@ export function TopBar() {
 
 function FolderBadge(props: { state: string; name?: string; onGrant(): void; onChoose(): void; onRescan(): void }) {
   const { state, name } = props;
-  if (state === 'granted')
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [open]);
+
+  if (state === 'unsupported')
     return (
-      <button onClick={props.onRescan} title={`${tr.actions.rescan}`} className="flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-fg-muted hover:text-fg">
-        <span className="h-1.5 w-1.5 rounded-full bg-up" />
-        {tr.folder.connected}: <span className="max-w-[160px] truncate text-fg">{name}</span>
-      </button>
-    );
-  if (state === 'prompt')
-    return (
-      <button onClick={props.onGrant} className="flex h-7 items-center gap-1.5 rounded-[3px] border border-amber/40 px-2 text-[11.5px] text-amber hover:bg-amber-soft">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-        {tr.actions.grantAccess}
-      </button>
+      <span className="flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-fg-faint" title={tr.folder.unsupported}>
+        <span className="h-1.5 w-1.5 rounded-full bg-fg-faint" />
+        Tarayıcıda saklanıyor
+      </span>
     );
   if (state === 'none')
     return (
@@ -79,9 +81,34 @@ function FolderBadge(props: { state: string; name?: string; onGrant(): void; onC
       </button>
     );
   return (
-    <span className="flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-fg-faint" title={tr.folder.unsupported}>
-      <span className="h-1.5 w-1.5 rounded-full bg-fg-faint" />
-      Tarayıcıda saklanıyor
-    </span>
+    <div ref={ref} className="relative flex items-center gap-1">
+      {state === 'prompt' ? (
+        <button onClick={props.onGrant} className="flex h-7 items-center gap-1.5 rounded-[3px] border border-amber/40 px-2 text-[11.5px] text-amber hover:bg-amber-soft">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber" />
+          {tr.actions.grantAccess}
+        </button>
+      ) : (
+        <button onClick={() => setOpen((o) => !o)} className="flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-fg-muted hover:text-fg">
+          <span className="h-1.5 w-1.5 rounded-full bg-up" />
+          {tr.folder.connected}: <span className="max-w-[160px] truncate text-fg">{name}</span>
+          <span className="text-fg-faint">▾</span>
+        </button>
+      )}
+      {state === 'prompt' && (
+        <button onClick={() => setOpen((o) => !o)} className="h-7 px-1 text-fg-faint hover:text-fg" aria-label="Klasör seçenekleri">▾</button>
+      )}
+      {open && (
+        <div className="absolute right-0 top-8 z-50 w-[220px] rounded-[3px] border border-ink-600 bg-ink-850 py-1 text-[12px] shadow-xl">
+          <div className="px-3 py-1.5 text-[11px] text-fg-faint">Klasör: <span className="text-fg">{name}</span></div>
+          {state === 'granted' && (
+            <button className="block w-full px-3 py-1.5 text-left text-fg-muted hover:bg-ink-800 hover:text-fg" onClick={() => { setOpen(false); props.onRescan(); }}>{tr.actions.rescan}</button>
+          )}
+          <button className="block w-full px-3 py-1.5 text-left text-fg-muted hover:bg-ink-800 hover:text-fg" onClick={() => { setOpen(false); props.onChoose(); }}>
+            {tr.actions.changeFolder}
+            <span className="block text-[10.5px] text-fg-faint">Kayıtlar yeni klasöre kopyalanır</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

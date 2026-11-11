@@ -14,6 +14,7 @@ interface Props {
   onPlaces(start: string, end: string): void;
   onNotes(notes: string): void;
   onAutoTrim(v: boolean): void;
+  top?: ReactNode;
 }
 
 /** Odak kaybında kaydeden metin alanı */
@@ -41,7 +42,7 @@ const Stat = ({ label, value, sub, tone }: { label: string; value: string; sub?:
   </div>
 );
 
-export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, onNotes, onAutoTrim }: Props) {
+export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, onNotes, onAutoTrim, top }: Props) {
   const m = result?.metrics ?? record.metrics;
   const prof = PROFILES[record.activity];
   const [name, setName] = useDraft(record.name);
@@ -53,7 +54,7 @@ export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, o
   const noTime = m.elapsedSec == null;
 
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
+    <aside className="flex w-[340px] shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-850">
       <div className="border-b border-ink-700 px-4 pb-3 pt-3">
         <input
           className="w-full bg-transparent text-[15px] font-semibold text-fg outline-none focus:bg-ink-800"
@@ -74,7 +75,9 @@ export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, o
         </div>
       </div>
 
-      <Section title="Özet">
+      {top}
+
+      <Section title="Rota özeti">
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Stat label={tr.metrics.distance} value={fmtKm(m.distanceM)} />
           <Stat label={tr.metrics.elapsed} value={fmtDuration(m.elapsedSec)} sub={noTime ? 'zaman bilgisi yok' : undefined} />

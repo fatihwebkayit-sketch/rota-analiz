@@ -7,10 +7,20 @@ import type { AnalysisResult } from '../workers/protocol';
 import { useApp } from '../state/store';
 import { baseStyle, COLORS, DEM_SOURCE } from './layers';
 import { PointTooltip } from './PointTooltip';
+import { fmtCoord } from '../core/format';
+
+export interface Selection { a: number; b: number | null }
 
 interface Props {
   result: AnalysisResult | null;
   activity: ActivityType;
+  grade: Float64Array | null;
+  /** Grafikten gelen imleç (haritada nokta olarak gösterilir) */
+  externalCursor: number | null;
+  onCursor(idx: number | null): void;
+  selection: Selection | null;
+  pickMode: boolean;
+  onPick(idx: number): void;
 }
 
 type Hover = { idx: number; x: number; y: number; pinned: boolean } | null;
@@ -31,6 +41,9 @@ function lineFeatures(r: AnalysisResult['route'], from: number, to: number): Geo
 }
 
 const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features });
+const pt = (r: AnalysisResult['route'], i: number, props: Record<string, unknown> = {}): GeoJSON.Feature => ({
+  type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [r.lon[i], r.lat[i]] },
+});
 
 function routeData(res: AnalysisResult) {
   const r = res.route;
@@ -38,23 +51,24 @@ function routeData(res: AnalysisResult) {
   const main = fc(lineFeatures(r, startIdx, endIdx));
   const trimmed = fc([...lineFeatures(r, 0, startIdx), ...lineFeatures(r, endIdx, r.lat.length - 1)]);
   const low: GeoJSON.Feature[] = [];
-  for (let i = 0; i < r.lat.length; i++)
-    if (res.lowConf[i]) low.push({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [r.lon[i], r.lat[i]] } });
-  const stops = fc(
-    res.stops.map((s) => ({ type: 'Feature', properties: { d: s.durationSec ?? 0 }, geometry: { type: 'Point', coordinates: [s.lon, s.lat] } })),
-  );
+  for (let i = 0; i < r.lat.length; i++) if (res.lowConf[i]) low.push(pt(r, i));
+  const stops = fc(res.stops.map((s) => ({ type: 'Feature', properties: { d: s.durationSec ?? 0 }, geometry: { type: 'Point', coordinates: [s.lon, s.lat] } })));
   return { main, trimmed, low: fc(low), stops };
 }
 
-export function MapView({ result, activity }: Props) {
+export function MapView({ result, activity, grade, externalCursor, onCursor, selection, pickMode, onPick }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
+  const styleReady = useRef(false);
   const markers = useRef<maplibregl.Marker[]>([]);
-  const resultRef = useRef<AnalysisResult | null>(result);
-  const { baseLayer, hillshade, terrain3d } = useApp();
+  const selMarkers = useRef<maplibregl.Marker[]>([]);
+  const { baseLayer, hillshade, terrain3d, toast } = useApp();
   const [hover, setHover] = useState<Hover>(null);
   const [styleTick, setStyleTick] = useState(0);
-  resultRef.current = result;
+
+  // Olay dinleyicileri en güncel değerleri ref üzerinden okur
+  const live = useRef({ result, pickMode, onPick, onCursor });
+  live.current = { result, pickMode, onPick, onCursor };
 
   const index = useMemo(() => {
     if (!result) return null;
@@ -80,25 +94,26 @@ export function MapView({ result, activity }: Props) {
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
-    map.on('style.load', () => setStyleTick((t) => t + 1));
-    // Altlık yüklenemezse (internet yok, sunucu kapalı) rota yine de boş zemin üzerinde gösterilir
+    // Not: isStyleLoaded() karolar yüklenirken de false döner; bu yüzden kendi bayrağımızı tutuyoruz.
+    map.on('style.load', () => {
+      styleReady.current = true;
+      setStyleTick((t) => t + 1);
+    });
     let fellBack = false;
     map.on('error', (e: any) => {
-      if (fellBack || map.isStyleLoaded()) return;
+      if (fellBack || styleReady.current) return;
       fellBack = true;
       console.warn('Harita altlığı yüklenemedi', e?.error?.message);
       map.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#16171a' } }] });
       useApp.getState().toast('Harita altlığı yüklenemedi (internet bağlantısını kontrol edin). Rota boş zemin üzerinde gösteriliyor.', 'error');
     });
-    map.on('styledata', () => { if (map.isStyleLoaded()) fellBack = false; });
     mapRef.current = map;
 
     let raf = 0;
-    const pick = (e: maplibregl.MapMouseEvent) => {
-      const res = resultRef.current, kd = indexRef.current;
-      if (!res || !kd) return null;
+    const pick = (p: { x: number; y: number }) => {
+      const res = live.current.result, kd = indexRef.current;
+      if (!res || !kd) return -1;
       const tol = 14;
-      const p = e.point;
       const a = map.unproject([p.x - tol, p.y + tol]);
       const b = map.unproject([p.x + tol, p.y - tol]);
       const ids = kd.range(Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat));
@@ -113,49 +128,70 @@ export function MapView({ result, activity }: Props) {
     map.on('mousemove', (e) => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const i = pick(e);
-        setHover((h) => (h?.pinned ? h : i != null && i >= 0 ? { idx: i, x: e.point.x, y: e.point.y, pinned: false } : null));
-        map.getCanvas().style.cursor = i != null && i >= 0 ? 'crosshair' : '';
+        const i = pick(e.point);
+        setHover((h) => (h?.pinned ? h : i >= 0 ? { idx: i, x: e.point.x, y: e.point.y, pinned: false } : null));
+        if (i >= 0) live.current.onCursor(i);
+        map.getCanvas().style.cursor = i >= 0 ? (live.current.pickMode ? 'copy' : 'crosshair') : live.current.pickMode ? 'crosshair' : '';
       });
     });
-    map.on('mouseout', () => setHover((h) => (h?.pinned ? h : null)));
-    map.on('click', (e) => {
-      const i = pick(e);
-      setHover(i != null && i >= 0 ? { idx: i, x: e.point.x, y: e.point.y, pinned: true } : null);
+    map.on('mouseout', () => {
+      setHover((h) => (h?.pinned ? h : null));
+      live.current.onCursor(null);
     });
-    map.on('move', () => setHover((h) => (h?.pinned ? null : h)));
+    map.on('click', (e) => {
+      const i = pick(e.point);
+      if (live.current.pickMode) {
+        if (i >= 0) live.current.onPick(i);
+        return;
+      }
+      setHover(i >= 0 ? { idx: i, x: e.point.x, y: e.point.y, pinned: true } : null);
+    });
+    map.on('movestart', () => setHover((h) => (h?.pinned ? null : h)));
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(el.current!);
     return () => {
       ro.disconnect();
       map.remove();
       mapRef.current = null;
+      styleReady.current = false;
     };
   }, []);
+
+  // C tuşu: fare altındaki noktanın koordinatını kopyala
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && hover && result) {
+        const c = fmtCoord(result.route.lat[hover.idx], result.route.lon[hover.idx]);
+        navigator.clipboard?.writeText(c).then(() => toast(`Koordinat kopyalandı: ${c}`));
+      }
+      if (e.key === 'Escape') setHover(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hover, result, toast]);
 
   // Altlık değişimi
   const firstStyle = useRef(true);
   useEffect(() => {
     if (firstStyle.current) { firstStyle.current = false; return; }
+    styleReady.current = false;
     mapRef.current?.setStyle(baseStyle(baseLayer) as any);
   }, [baseLayer]);
 
   // Kabartma, 3B arazi ve rota katmanları (her stil yüklemesinde yeniden kurulur)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !styleReady.current) return;
     const firstSymbol = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
 
-    if (hillshade || terrain3d) {
-      if (!map.getSource('dem')) map.addSource('dem', DEM_SOURCE as any);
-    }
+    if ((hillshade || terrain3d) && !map.getSource('dem')) map.addSource('dem', DEM_SOURCE as any);
     if (hillshade && !map.getLayer('hillshade')) {
       if (!map.getSource('dem-hs')) map.addSource('dem-hs', DEM_SOURCE as any);
       map.addLayer(
         {
-          id: 'hillshade',
-          type: 'hillshade',
-          source: 'dem-hs',
+          id: 'hillshade', type: 'hillshade', source: 'dem-hs',
           paint: {
             'hillshade-exaggeration': baseLayer === 'dark' ? 0.35 : 0.5,
             'hillshade-shadow-color': '#000000',
@@ -180,13 +216,16 @@ export function MapView({ result, activity }: Props) {
     ensure('r-trim', d.trimmed);
     ensure('r-low', d.low);
     ensure('r-stops', d.stops);
+    if (!map.getSource('r-sel')) map.addSource('r-sel', { type: 'geojson', data: empty });
+    if (!map.getSource('r-hover')) map.addSource('r-hover', { type: 'geojson', data: empty });
     if (!map.getLayer('r-trim')) {
       map.addLayer({ id: 'r-trim', type: 'line', source: 'r-trim', layout: { 'line-cap': 'round' }, paint: { 'line-color': COLORS.trimmed, 'line-width': 2.5, 'line-dasharray': [1.5, 2], 'line-opacity': 0.8 } });
       map.addLayer({ id: 'r-casing', type: 'line', source: 'r-main', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': COLORS.casing, 'line-width': 7, 'line-opacity': 0.75 } });
       map.addLayer({ id: 'r-main', type: 'line', source: 'r-main', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': COLORS.route, 'line-width': 3.5 } });
+      map.addLayer({ id: 'r-sel-casing', type: 'line', source: 'r-sel', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#000000', 'line-width': 9, 'line-opacity': 0.55 } });
+      map.addLayer({ id: 'r-sel', type: 'line', source: 'r-sel', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffd28a', 'line-width': 5 } });
       map.addLayer({ id: 'r-low', type: 'circle', source: 'r-low', paint: { 'circle-radius': 3, 'circle-color': COLORS.lowConf, 'circle-stroke-color': '#1a1b1d', 'circle-stroke-width': 1 } });
       map.addLayer({ id: 'r-stops', type: 'circle', source: 'r-stops', paint: { 'circle-radius': ['interpolate', ['linear'], ['get', 'd'], 30, 3.5, 600, 7], 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': COLORS.stop, 'circle-stroke-width': 1.5, 'circle-stroke-opacity': 0.85 } });
-      map.addSource('r-hover', { type: 'geojson', data: empty });
       map.addLayer({ id: 'r-hover', type: 'circle', source: 'r-hover', paint: { 'circle-radius': 6, 'circle-color': COLORS.route, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
     }
   }, [result, hillshade, terrain3d, styleTick, baseLayer]);
@@ -197,7 +236,7 @@ export function MapView({ result, activity }: Props) {
     markers.current.forEach((m) => m.remove());
     markers.current = [];
     if (!map || !result) return;
-    const { start, end, trim } = result.metrics;
+    const { start, end } = result.metrics;
     const mk = (cls: string, title: string) => {
       const d = document.createElement('div');
       d.className = `ra-marker ${cls}`;
@@ -206,25 +245,39 @@ export function MapView({ result, activity }: Props) {
     };
     if (start) markers.current.push(new maplibregl.Marker({ element: mk('ra-start', 'Başlangıç') }).setLngLat(start).addTo(map));
     if (end) markers.current.push(new maplibregl.Marker({ element: mk('ra-end', 'Bitiş') }).setLngLat(end).addTo(map));
-    const r = result.route;
-    let a = [Infinity, Infinity], b = [-Infinity, -Infinity];
-    for (let i = trim.startIdx; i <= trim.endIdx; i++) {
-      a = [Math.min(a[0], r.lon[i]), Math.min(a[1], r.lat[i])];
-      b = [Math.max(b[0], r.lon[i]), Math.max(b[1], r.lat[i])];
-    }
-    if (isFinite(a[0])) map.fitBounds([a as [number, number], b as [number, number]], { padding: 70, duration: 0, maxZoom: 16 });
+    const bb = result.metrics.bbox;
+    if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: 70, duration: 0, maxZoom: 16 });
     setHover(null);
   }, [result]);
 
-  // Vurgulanan nokta
+  // Seçilen bölüm: vurgulu çizgi + A/B işaretleri
   useEffect(() => {
     const map = mapRef.current;
-    const src = map?.getSource('r-hover') as GeoJSONSource | undefined;
+    selMarkers.current.forEach((m) => m.remove());
+    selMarkers.current = [];
+    if (!map || !result) return;
+    const r = result.route;
+    const src = map.getSource('r-sel') as GeoJSONSource | undefined;
+    const mk = (label: string) => {
+      const d = document.createElement('div');
+      d.className = 'ra-selmarker';
+      d.textContent = label;
+      return d;
+    };
+    if (selection) {
+      selMarkers.current.push(new maplibregl.Marker({ element: mk('A') }).setLngLat([r.lon[selection.a], r.lat[selection.a]]).addTo(map));
+      if (selection.b != null) selMarkers.current.push(new maplibregl.Marker({ element: mk('B') }).setLngLat([r.lon[selection.b], r.lat[selection.b]]).addTo(map));
+    }
+    src?.setData(selection && selection.b != null ? fc(lineFeatures(r, Math.min(selection.a, selection.b), Math.max(selection.a, selection.b))) : fc([]));
+  }, [selection, result, styleTick]);
+
+  // Vurgulanan nokta: haritadaki fare ya da grafikteki imleç
+  const cursorIdx = hover?.idx ?? externalCursor;
+  useEffect(() => {
+    const src = mapRef.current?.getSource('r-hover') as GeoJSONSource | undefined;
     if (!src || !result) return;
-    src.setData(
-      fc(hover ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [result.route.lon[hover.idx], result.route.lat[hover.idx]] } }] : []),
-    );
-  }, [hover, result, styleTick]);
+    src.setData(fc(cursorIdx != null ? [pt(result.route, cursorIdx)] : []));
+  }, [cursorIdx, result, styleTick]);
 
   const fit = () => {
     const map = mapRef.current;
@@ -237,10 +290,10 @@ export function MapView({ result, activity }: Props) {
     <div className="relative h-full w-full">
       <div ref={el} className="h-full w-full" />
       {result && hover && (
-        <PointTooltip result={result} idx={hover.idx} x={hover.x} y={hover.y} pinned={hover.pinned} activity={activity} onClose={() => setHover(null)} />
+        <PointTooltip result={result} grade={grade} idx={hover.idx} x={hover.x} y={hover.y} pinned={hover.pinned} activity={activity} onClose={() => setHover(null)} />
       )}
       {result && (
-        <button onClick={fit} className="ra-mapbtn absolute bottom-[118px] right-[10px]" title="Rotaya yakınlaş">
+        <button onClick={fit} className="ra-mapbtn absolute bottom-[118px] right-[10px]" title="Rotanın tamamını göster">
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" /></svg>
         </button>
       )}

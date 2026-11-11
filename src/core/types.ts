@@ -113,6 +113,13 @@ export interface RouteMetrics {
   quality: QualityReport;
 }
 
+export interface SavedSegment {
+  id: string;
+  name: string;
+  a: number; // ham nokta indeksi (ham veri değişmediği için kalıcıdır)
+  b: number;
+}
+
 export interface RouteRecord {
   id: string;
   schemaVersion: 1;
@@ -134,6 +141,7 @@ export interface RouteRecord {
     stats?: SourceAppStats;
   };
   autoTrim: boolean;
+  segments?: SavedSegment[];
   metrics: RouteMetrics;
   preview: [number, number][]; // basitleştirilmiş [lon, lat] dizisi (liste küçük haritası)
   folderName?: string;

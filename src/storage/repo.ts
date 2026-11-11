@@ -94,3 +94,12 @@ export function findDuplicate(records: RouteRecord[], sha256: string) {
 
 export const newId = () =>
   (crypto as any).randomUUID?.() ?? 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+/** Klasör değiştirilirken: kaynak dosyaları önbelleğe al ve kayıtları yeni klasöre yazılacak şekilde işaretle. */
+export async function prepareFolderChange(oldRoot?: FileSystemDirectoryHandle) {
+  const d = await db();
+  for (const r of await d.getAll('records')) {
+    if (oldRoot) await getSourceBytes(r, oldRoot).catch(() => undefined);
+    if (r.folderName) await d.put('records', { ...r, folderName: undefined });
+  }
+}

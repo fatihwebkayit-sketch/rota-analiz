@@ -7,6 +7,7 @@ import { tr } from '../i18n/tr';
 
 interface Props {
   result: AnalysisResult;
+  grade: Float64Array | null;
   idx: number;
   x: number;
   y: number;
@@ -15,19 +16,7 @@ interface Props {
   onClose(): void;
 }
 
-/** Yerel eğim: ±25 m mesafe penceresi (Aşama 2'de türe göre pencere ve grafiklerle genişleyecek). */
-function localGrade(res: AnalysisResult, i: number, halfM: number) {
-  const { route: r, cum } = res;
-  if (!isFinite(r.ele[i])) return null;
-  let a = i, b = i;
-  while (a > 0 && cum[i] - cum[a - 1] <= halfM && isFinite(r.ele[a - 1])) a--;
-  while (b < r.lat.length - 1 && cum[b + 1] - cum[i] <= halfM && isFinite(r.ele[b + 1])) b++;
-  const dist = cum[b] - cum[a];
-  if (dist < halfM * 0.6) return null;
-  return ((r.ele[b] - r.ele[a]) / dist) * 100;
-}
-
-export function PointTooltip({ result, idx, x, y, pinned, activity, onClose }: Props) {
+export function PointTooltip({ result, grade, idx, x, y, pinned, activity, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const r = result.route;
   const { startIdx, endIdx } = result.metrics.trim;
@@ -38,10 +27,16 @@ export function PointTooltip({ result, idx, x, y, pinned, activity, onClose }: P
   const t0 = r.time[startIdx];
   const elapsed = isFinite(r.time[idx] - t0) ? (r.time[idx] - t0) / 1000 : null;
   const v = result.speedKmh[idx];
-  const grade = localGrade(result, idx, prof.gradeWindowM / 2);
-  const prevEle = idx > startIdx ? r.ele[idx - 1] : NaN;
+  const g = grade ? grade[idx] : NaN;
+  const prevEle = idx > 0 ? r.ele[idx - 1] : NaN;
   const dEle = isFinite(ele) && isFinite(prevEle) ? ele - prevEle : null;
   const coord = fmtCoord(lat, lon);
+
+  const copy = () =>
+    navigator.clipboard?.writeText(coord).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    });
 
   const rows: [string, string][] = [
     [tr.map.dist, fmtKm(result.cum[idx])],
@@ -52,20 +47,19 @@ export function PointTooltip({ result, idx, x, y, pinned, activity, onClose }: P
     rows.push([tr.map.elapsed, fmtDuration(elapsed, true)]);
     rows.push([tr.map.clock, fmtTime(r.time[idx], true)]);
   }
-  rows.push(['Eğim', grade == null ? '—' : `%${fmt1(grade)}`]);
+  rows.push(['Eğim', isFinite(g) ? `%${fmt1(g)}` : '—']);
   rows.push(['Rakım değişimi', dEle == null ? '—' : `${dEle >= 0 ? '+' : ''}${fmt1(dEle)} m`]);
 
   // Ekran kenarına taşmasın
-  const left = x > window.innerWidth - 520 ? x - 236 : x + 16;
-  const top = Math.max(8, y - 20);
+  const left = x > window.innerWidth - 620 ? x - 246 : x + 16;
+  const top = Math.max(8, Math.min(y - 20, window.innerHeight - 330));
 
   return (
-    <div
-      className={`ra-tooltip absolute z-20 w-[220px] ${pinned ? '' : 'pointer-events-none'}`}
-      style={{ left, top }}
-    >
-      <div className="flex items-center justify-between border-b border-ink-600 px-2.5 py-1.5">
-        <span className="font-mono text-[11px] text-fg">{coord}</span>
+    <div className={`ra-tooltip absolute z-20 w-[230px] ${pinned ? '' : 'pointer-events-none'}`} style={{ left, top }}>
+      <div className="flex items-center justify-between gap-2 border-b border-ink-600 px-2.5 py-1.5">
+        <button onClick={copy} className="truncate font-mono text-[11px] text-fg hover:text-amber" title="Koordinatı kopyala">
+          {copied ? tr.actions.copied : coord}
+        </button>
         {pinned && (
           <button onClick={onClose} className="text-fg-faint hover:text-fg" aria-label="Kapat">×</button>
         )}
@@ -80,18 +74,15 @@ export function PointTooltip({ result, idx, x, y, pinned, activity, onClose }: P
           </div>
         ))}
       </dl>
-      {pinned && (
+      {pinned ? (
         <div className="flex gap-1.5 border-t border-ink-600 px-2.5 py-1.5">
-          <button
-            className="ra-chip"
-            onClick={() => {
-              navigator.clipboard?.writeText(coord).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); });
-            }}
-          >
-            {copied ? tr.actions.copied : tr.actions.copy}
-          </button>
-          <a className="ra-chip" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${lat},${lon}`}>{tr.map.openGoogle}</a>
+          <button className="ra-chip" onClick={copy}>{copied ? tr.actions.copied : 'Koordinatı kopyala'}</button>
+          <a className="ra-chip" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${lat},${lon}`}>Haritalar</a>
           <a className="ra-chip" target="_blank" rel="noreferrer" href={`https://earth.google.com/web/search/${lat},${lon}`}>Earth</a>
+        </div>
+      ) : (
+        <div className="border-t border-ink-600 px-2.5 py-1 text-[10.5px] text-fg-faint">
+          <kbd className="rounded-[2px] border border-ink-500 px-1 text-fg-muted">C</kbd> kopyala · tıkla: sabitle
         </div>
       )}
     </div>
