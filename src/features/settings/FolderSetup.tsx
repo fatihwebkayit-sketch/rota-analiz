@@ -13,10 +13,10 @@ export function FolderSetup() {
         <div className="mt-3 rounded-[3px] border border-ink-700 bg-ink-900 px-3 py-2 font-mono text-[11.5px] text-fg">{tr.folder.hint}</div>
         <ol className="mt-3 list-decimal space-y-1 pl-5 text-[12px] text-fg-muted">
           <li>“Veri klasörü seç” düğmesine basın.</li>
-          <li>Google Drive içinde <span className="text-fg">Rotalarım</span> adında bir klasör oluşturup seçin.</li>
-          <li>Chrome “düzenleme izni” sorduğunda <span className="text-fg">İzin ver</span> deyin.</li>
+          <li>Açılan pencerede Google Drive'a (<span className="text-fg">G:</span>) gidin, <span className="text-fg">Drive'ım</span> içinde <span className="text-fg">Rotalarım</span> adında yeni klasör oluşturun, içine girip <span className="text-fg">Klasör seç</span>'e basın.</li>
+          <li>Chrome düzenleme izni sorduğunda <span className="text-fg">Dosyaları düzenle</span>'yi onaylayın.</li>
         </ol>
-        <p className="mt-3 text-[11.5px] text-fg-faint">Ofis bilgisayarında aynı klasörü seçtiğinizde kayıtlarınız orada da görünür.{records.length ? ` Bu tarayıcıdaki ${records.length} kayıt klasöre taşınır.` : ''}</p>
+        <p className="mt-2 text-[11.5px] text-fg-faint">Sürücünün kendisini (G:\) seçmeyin; Chrome sürücü köklerine izin vermez. Ofis bilgisayarında aynı klasörü seçtiğinizde kayıtlarınız orada da görünür.{records.length ? ` Bu tarayıcıdaki ${records.length} kayıt klasöre taşınır.` : ''}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button className="ra-btn" onClick={dismissFolderSetup}>{tr.folder.later}</button>
           <button className="ra-btn-primary" onClick={chooseFolder}>{tr.actions.chooseFolder}</button>

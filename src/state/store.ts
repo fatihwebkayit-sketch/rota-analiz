@@ -104,7 +104,12 @@ export const useApp = create<AppState>((set, get) => ({
       savePref('folderSetupSeen', true);
       await get().syncFolder();
     } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') get().toast('Klasör seçilemedi: ' + (e as Error).message, 'error');
+      const err = e as Error;
+      if (err?.name === 'AbortError')
+        get().toast('Klasör seçimi tamamlanmadı. Klasörü seçip “Klasör seç”e basın; Chrome düzenleme izni sorarsa “Dosyaları düzenle”yi onaylayın. Sürücünün kendisini (G:\\) değil, içindeki Rotalarım klasörünü seçin.', 'error');
+      else if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError')
+        get().toast('Chrome bu klasöre erişime izin vermedi. Sistem klasörü veya sürücü kökü olmayan bir klasör seçin (ör. G:\\Drive\'ım\\Rotalarım).', 'error');
+      else get().toast(`Klasör seçilemedi (${err?.name ?? 'hata'}): ${err?.message ?? err}`, 'error');
     }
   },
 
@@ -173,6 +178,6 @@ export const useApp = create<AppState>((set, get) => ({
   toast(text, tone = 'info') {
     const id = ++toastSeq;
     set({ toasts: [...get().toasts, { id, text, tone }] });
-    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), 4500);
+    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), tone === 'error' ? 12000 : 4500);
   },
 }));
