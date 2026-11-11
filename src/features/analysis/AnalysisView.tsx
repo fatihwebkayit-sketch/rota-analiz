@@ -22,6 +22,8 @@ export function AnalysisView() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [pickMode, setPickMode] = useState(false);
   const [activeSaved, setActiveSaved] = useState<string | null>(null);
+  const [pinReq, setPinReq] = useState<{ idx: number; n: number } | null>(null);
+  const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
 
   // Orijinal dosyayı oku ve ayrıştır
   useEffect(() => {
@@ -134,6 +136,8 @@ export function AnalysisView() {
             selection={selection}
             pickMode={pickMode}
             onPick={onPick}
+            pinRequest={pinReq}
+            onPinChange={setPinnedIdx}
           />
           <LayerControl />
           {pickMode && (
@@ -161,6 +165,8 @@ export function AnalysisView() {
               cursorFromChart={cursor.fromChart}
               onCursor={onCursorChart}
               selection={selection}
+              onPin={(idx) => setPinReq((p) => ({ idx, n: (p?.n ?? 0) + 1 }))}
+              pinnedIdx={pinnedIdx}
               onSelectRange={(a, b) => { setActiveSaved(null); setPickMode(false); setSelection({ a, b }); }}
             />
           </div>

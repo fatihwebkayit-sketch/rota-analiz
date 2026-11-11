@@ -21,6 +21,9 @@ interface Props {
   selection: Selection | null;
   pickMode: boolean;
   onPick(idx: number): void;
+  /** Grafikten gelen sabitleme isteği; n her istekte artar */
+  pinRequest: { idx: number; n: number } | null;
+  onPinChange(idx: number | null): void;
 }
 
 type Hover = { idx: number; x: number; y: number; pinned: boolean } | null;
@@ -56,7 +59,7 @@ function routeData(res: AnalysisResult) {
   return { main, trimmed, low: fc(low), stops };
 }
 
-export function MapView({ result, activity, grade, externalCursor, onCursor, selection, pickMode, onPick }: Props) {
+export function MapView({ result, activity, grade, externalCursor, onCursor, selection, pickMode, onPick, pinRequest, onPinChange }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const styleReady = useRef(false);
@@ -146,7 +149,15 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
       }
       setHover(i >= 0 ? { idx: i, x: e.point.x, y: e.point.y, pinned: true } : null);
     });
-    map.on('movestart', () => setHover((h) => (h?.pinned ? null : h)));
+    map.on('move', () => {
+      const res = live.current.result;
+      setHover((h) => {
+        if (!h || !res) return h;
+        if (!h.pinned) return null;
+        const q = map.project([res.route.lon[h.idx], res.route.lat[h.idx]]);
+        return { ...h, x: q.x, y: q.y };
+      });
+    });
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(el.current!);
     return () => {
@@ -156,6 +167,28 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
       styleReady.current = false;
     };
   }, []);
+
+  // Sabitlenen nokta grafiğe bildirilir
+  const pinnedIdx = hover?.pinned ? hover.idx : null;
+  useEffect(() => { onPinChange(pinnedIdx); }, [pinnedIdx]);
+
+  // Grafikte tıklanan noktayı haritada göster (görünür alanda değilse oraya kaydır)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !result || !pinRequest) return;
+    const i = pinRequest.idx;
+    const ll: [number, number] = [result.route.lon[i], result.route.lat[i]];
+    const pinAt = () => {
+      const q = map.project(ll);
+      setHover({ idx: i, x: q.x, y: q.y, pinned: true });
+    };
+    if (map.getBounds().contains(ll)) pinAt();
+    else {
+      setHover(null);
+      map.once('moveend', pinAt);
+      map.easeTo({ center: ll, duration: 600 });
+    }
+  }, [pinRequest]);
 
   // C tuşu: fare altındaki noktanın koordinatını kopyala
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent, BrushComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent, ToolboxComponent} from 'echarts/components';
+import { GridComponent, TooltipComponent, BrushComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent, ToolboxComponent, GraphicComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ActivityType } from '../core/types';
 import type { AnalysisResult } from '../workers/protocol';
@@ -10,7 +10,7 @@ import { PROFILES } from '../analysis/activity';
 import { fmtDuration, fmt1 } from '../core/format';
 import type { Selection } from '../map/MapView';
 
-echarts.use([LineChart, GridComponent, TooltipComponent, BrushComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent, ToolboxComponent, CanvasRenderer]);
+echarts.use([LineChart, GridComponent, TooltipComponent, BrushComponent, MarkLineComponent, MarkAreaComponent, DataZoomComponent, ToolboxComponent, GraphicComponent, CanvasRenderer]);
 
 export type ChartMetric = 'ele' | 'speed' | 'grade' | 'time' | 'climb';
 
@@ -24,6 +24,9 @@ interface Props {
   onCursor(idx: number | null): void;
   selection: Selection | null;
   onSelectRange(a: number, b: number): void;
+  /** Grafikte tıklanan nokta (haritada işaretlenir) */
+  onPin(idx: number): void;
+  pinnedIdx: number | null;
 }
 
 const C = { ele: '#f0a03c', eleFill: 'rgba(240,160,60,0.14)', ctx: 'rgba(154,156,161,0.18)', up: '#5fb57f', down: '#e2614f', axis: '#6b6e74', grid: '#25272b', text: '#9a9ca1' };
@@ -36,12 +39,13 @@ const TABS: { id: ChartMetric; label: string }[] = [
   { id: 'climb', label: 'Tırmanış / İniş' },
 ];
 
-export function ProfileChart({ result, grade, climb, activity, cursorIdx, cursorFromChart, onCursor, selection, onSelectRange }: Props) {
+export function ProfileChart({ result, grade, climb, activity, cursorIdx, cursorFromChart, onCursor, selection, onSelectRange, onPin, pinnedIdx }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
   const [metric, setMetric] = useState<ChartMetric>('ele');
-  const live = useRef({ onCursor, onSelectRange, result });
-  live.current = { onCursor, onSelectRange, result };
+  const [zoomTick, setZoomTick] = useState(0);
+  const live = useRef({ onCursor, onSelectRange, onPin, result });
+  live.current = { onCursor, onSelectRange, onPin, result };
   const prof = PROFILES[activity];
   const { startIdx: a0, endIdx: b0 } = result.metrics.trim;
   const r = result.route;
@@ -88,6 +92,19 @@ export function ProfileChart({ result, grade, climb, activity, cursorIdx, cursor
       });
     });
     c.getZr().on('globalout', () => live.current.onCursor(null));
+    c.on('dataZoom', () => setZoomTick((t) => t + 1));
+    // Tıklama (sürüklemeden): noktayı haritada işaretle
+    let downX = 0;
+    c.getZr().on('mousedown', (e: any) => { downX = e.offsetX; });
+    c.getZr().on('mouseup', (e: any) => {
+      if (Math.abs(e.offsetX - downX) > 3) return;
+      const res = live.current.result;
+      if (!c.containPixel({ gridIndex: 0 }, [e.offsetX, e.offsetY])) return;
+      const km = c.convertFromPixel({ xAxisIndex: 0 }, e.offsetX) as number;
+      if (!isFinite(km)) return;
+      const { startIdx, endIdx } = res.metrics.trim;
+      live.current.onPin(indexAtDistance(res.cum, km * 1000, startIdx, endIdx));
+    });
     c.on('brushEnd', (e: any) => {
       const range = e.areas?.[0]?.coordRange as [number, number] | undefined;
       if (!range) return;
@@ -183,20 +200,50 @@ export function ProfileChart({ result, grade, climb, activity, cursorIdx, cursor
     c.dispatchAction({ type: 'takeGlobalCursor', key: 'brush', brushOption: { brushType: 'lineX', brushMode: 'single' } });
   }, [metric, data, selection, result]);
 
-  // Haritadan gelen imleç → dikey çizgi (grafik öğesi; seri verisine dokunmaz)
+  // Grafik üzerindeki değer (aktif sekmeye göre) — imleç noktasının yüksekliği için
+  const valueAt = (i: number): number | null => {
+    const m = available[metric] ? metric : 'ele';
+    const v =
+      m === 'ele' ? r.ele[i]
+      : m === 'speed' ? result.speedKmh[i]
+      : m === 'grade' ? Math.max(grade[i], 0) // yokuş serisi üstünde; inişte sıfır çizgisinde
+      : m === 'time' ? (r.time[i] - r.time[a0]) / 60000
+      : climb.up[i];
+    if (m === 'grade' && grade[i] < 0) return grade[i];
+    return isFinite(v) ? v : null;
+  };
+
+  // Haritadan gelen imleç → grafikte dikey çizgi + nokta; tıklanıp sabitlenen nokta → kalıcı işaret
   useEffect(() => {
     const c = chart.current;
-    if (!c || cursorFromChart) return;
+    if (!c) return;
     const h = c.getHeight();
-    let x = NaN;
-    if (cursorIdx != null) {
-      try { x = c.convertToPixel({ xAxisIndex: 0 }, result.cum[cursorIdx] / 1000) as number; } catch { x = NaN; }
-    }
+    const px = (i: number | null): [number, number] | null => {
+      if (i == null) return null;
+      try {
+        const km = result.cum[i] / 1000;
+        const x = c.convertToPixel({ xAxisIndex: 0 }, km) as number;
+        const v = valueAt(i);
+        const y = v == null ? NaN : (c.convertToPixel({ yAxisIndex: 0 }, v) as number);
+        return isFinite(x) ? [x, y] : null;
+      } catch {
+        return null;
+      }
+    };
+    const cur = cursorFromChart ? null : px(cursorIdx);
+    const pin = px(pinnedIdx);
     c.setOption(
-      { graphic: [{ id: 'cur', type: 'line', silent: true, invisible: !isFinite(x), shape: { x1: x || 0, y1: 22, x2: x || 0, y2: h - 26 }, style: { stroke: '#ffffff', opacity: 0.75, lineWidth: 1 }, z: 100 }] },
+      {
+        graphic: [
+          { id: 'cur', type: 'line', silent: true, invisible: !cur, shape: { x1: cur?.[0] ?? 0, y1: 22, x2: cur?.[0] ?? 0, y2: h - 26 }, style: { stroke: '#ffffff', opacity: 0.6, lineWidth: 1, lineDash: [3, 3] }, z: 100 },
+          { id: 'curdot', type: 'circle', silent: true, invisible: !cur || !isFinite(cur[1]), shape: { cx: cur?.[0] ?? 0, cy: cur && isFinite(cur[1]) ? cur[1] : 0, r: 5 }, style: { fill: '#f0a03c', stroke: '#ffffff', lineWidth: 2 }, z: 101 },
+          { id: 'pin', type: 'line', silent: true, invisible: !pin, shape: { x1: pin?.[0] ?? 0, y1: 22, x2: pin?.[0] ?? 0, y2: h - 26 }, style: { stroke: '#ffd28a', opacity: 0.9, lineWidth: 1.5 }, z: 99 },
+          { id: 'pindot', type: 'circle', silent: true, invisible: !pin || !isFinite(pin[1]), shape: { cx: pin?.[0] ?? 0, cy: pin && isFinite(pin[1]) ? pin[1] : 0, r: 4.5 }, style: { fill: '#ffd28a', stroke: '#131415', lineWidth: 1.5 }, z: 99 },
+        ],
+      },
       { lazyUpdate: true },
     );
-  }, [cursorIdx, cursorFromChart, result]);
+  }, [cursorIdx, cursorFromChart, pinnedIdx, result, metric, data, selection, zoomTick]);
 
   return (
     <div className="flex h-full flex-col">
@@ -215,7 +262,7 @@ export function ProfileChart({ result, grade, climb, activity, cursorIdx, cursor
             </button>
           ))}
         </div>
-        <span className="ml-auto text-[10.5px] text-fg-faint">Sürükle: bölüm seç · Tekerlek: yakınlaş</span>
+        <span className="ml-auto text-[10.5px] text-fg-faint">Tıkla: haritada göster · Sürükle: bölüm seç · Tekerlek: yakınlaş</span>
       </div>
       <div ref={el} className="min-h-0 flex-1" />
     </div>
