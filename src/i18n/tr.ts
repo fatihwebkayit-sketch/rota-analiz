@@ -6,6 +6,7 @@ export const tr = {
   nav: { archive: 'Arşiv', analysis: 'Analiz', stats: 'İstatistik', settings: 'Araçlar ve Ayarlar', compare: 'Karşılaştırma' },
   activity: {
     car: 'Araç',
+    moto: 'Motosiklet',
     walk: 'Yürüyüş',
     run: 'Koşu',
     bike: 'Bisiklet',

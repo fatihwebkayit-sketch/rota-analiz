@@ -74,11 +74,12 @@ export async function buildCard(ctx: ExportContext, opt: ExportOptions, shape: C
   ];
   if (activity === 'walk' || activity === 'run') {
     stats.push(['Tempo', fmtPace(m.avgSpeedKmh)], ['Tırmanış', fmtM(m.ascentM), UP], ['En yüksek', fmtM(m.maxEle)], ['Hareket', fmtDuration(m.movingSec)]);
-  } else if (activity === 'car') {
+  } else if (activity === 'car' || activity === 'moto') {
     stats.push(['Ort. hız', fmtKmh(m.avgSpeedKmh)], ['Maks. hız', fmtKmh(m.maxSpeedKmh)]);
-    if (rec.fuel) {
-      const r = computeFuel(m.distanceM, rec.fuel);
-      stats.push(['Yakıt + masraf', `${CURRENCY_SYMBOL[rec.fuel.currency]}${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(r.total)}`, AMBER]);
+    const fuelOk = rec.fuel && rec.fuel.price > 0 && rec.fuel.priceDate != null && rec.fuel.priceDate <= (m.startTime ?? rec.createdAt) + 864e5;
+    if (rec.fuel && fuelOk) {
+      const r = computeFuel(m.distanceM, rec.fuel!);
+      stats.push(['Yakıt + masraf', `${CURRENCY_SYMBOL[rec.fuel!.currency]}${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(r.total)}`, AMBER]);
     } else stats.push(['Tırmanış', fmtM(m.ascentM), UP]);
     stats.push(['Hareket', fmtDuration(m.movingSec)]);
   } else {

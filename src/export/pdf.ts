@@ -131,7 +131,7 @@ export async function buildPdf(ctx: ExportContext, opt: ExportOptions, onProgres
   }
 
   // Yakıt
-  if (opt.sections.fuel && activity === 'car' && rec.fuel) {
+  if (opt.sections.fuel && PROFILES[activity].fuel && rec.fuel) {
     const f = rec.fuel;
     const r = computeFuel(m.distanceM, f);
     const u = unitOf(f.fuel);
@@ -144,7 +144,9 @@ export async function buildPdf(ctx: ExportContext, opt: ExportOptions, onProgres
     rows.push(['Toplam', money(r.total)], ['Km başı', money(r.perKm)]);
     if (f.persons > 1) rows.push([`Kişi başı (${f.persons} kişi)`, money(r.perPerson)]);
     content.push({ columns: [kv(rows), { text: '' }], columnGap: 24 });
-    content.push({ text: 'Tahmin, GPS hızından bağımsız olarak mesafe ve girilen varsayımlarla hesaplanmıştır.', fontSize: 8, color: MUTED, margin: [0, 4, 0, 0] });
+    const dayEnd = (m.startTime ?? rec.createdAt) + 864e5;
+    const priceNote = f.priceDate == null ? ' Birim fiyatın tarihi doğrulanmamıştır.' : f.priceDate > dayEnd ? ` Uyarı: birim fiyat rota tarihinden sonraki bir tarihe aittir (${new Intl.DateTimeFormat('tr-TR').format(f.priceDate)}).` : '';
+    content.push({ text: 'Tahmin, GPS hızından bağımsız olarak mesafe ve girilen varsayımlarla hesaplanmıştır.' + priceNote, fontSize: 8, color: MUTED, margin: [0, 4, 0, 0] });
   }
 
   // Notlar

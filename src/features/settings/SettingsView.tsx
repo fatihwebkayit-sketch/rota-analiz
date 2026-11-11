@@ -29,6 +29,7 @@ export function SettingsView() {
   const [showArchived, setShowArchived] = useState(false);
   const [priceDraft, setPriceDraft] = useState<Record<string, string>>({});
   const [currency, setCurrency] = useState<Currency>('TRY');
+  const [priceDay, setPriceDay] = useState(() => isoDateTR(Date.now()));
   const [busy, setBusy] = useState(false);
   const restoreInput = useRef<HTMLInputElement>(null);
   const root = folderState === 'granted' ? folderHandle : undefined;
@@ -38,7 +39,8 @@ export function SettingsView() {
   const savePrice = (f: FuelType) => {
     const v = parseFloat((priceDraft[f] ?? '').replace(',', '.'));
     if (!isFinite(v) || v <= 0) return toast('Geçerli bir fiyat girin', 'error');
-    addFuelPrice({ fuel: f, price: v, currency, date: Date.now() });
+    const d = new Date(priceDay + 'T12:00:00+03:00').getTime();
+    addFuelPrice({ fuel: f, price: v, currency, date: isFinite(d) ? d : Date.now() });
     setPriceDraft((d) => ({ ...d, [f]: '' }));
     toast(`${FUEL_LABEL[f]} fiyatı kaydedildi`);
   };
@@ -131,7 +133,7 @@ export function SettingsView() {
                             {v.isDefault && !v.archived && <span className="ml-2 rounded-[2px] border border-amber/50 px-1 text-[10px] uppercase text-amber">Varsayılan</span>}
                             {v.archived && <span className="ml-2 text-[10.5px] text-fg-faint">arşivde</span>}
                           </div>
-                          <div className="text-[11px] text-fg-faint">{[v.brand, v.model, v.year].filter(Boolean).join(' ')}</div>
+                          <div className="text-[11px] text-fg-faint">{[v.kind === 'moto' ? 'Motosiklet' : 'Otomobil', v.brand, v.model, v.year].filter(Boolean).join(' · ')}</div>
                         </td>
                         <td>{FUEL_LABEL[v.fuel]}</td>
                         <td className="text-right tnum">{fmt2(v.avg)} {u}/100 km</td>
@@ -157,12 +159,14 @@ export function SettingsView() {
           </Card>
         </div>
 
-        <Card title="Yakıt fiyatları" sub="Bir kez girin; yeni rotalarda son fiyat önerilir. Her rota hesaplandığı günün fiyatını saklar.">
+        <Card title="Yakıt fiyatları" sub="Her rotada, rota tarihinde geçerli olan fiyat kullanılır. Eski rotalar için geçmiş tarihli fiyat da girebilirsiniz.">
           <div className="mb-2 flex items-center gap-2 text-[11.5px] text-fg-muted">
             Para birimi
             <select className="ra-input" value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
               <option value="TRY">₺ TL</option><option value="EUR">€ Euro</option><option value="USD">$ Dolar</option>
             </select>
+            <span className="ml-3">Fiyat tarihi</span>
+            <input type="date" className="ra-input" value={priceDay} max={isoDateTR(Date.now())} onChange={(e) => setPriceDay(e.target.value)} />
           </div>
           <table className="w-full text-[12.5px]">
             <tbody>
@@ -222,6 +226,8 @@ export function SettingsView() {
           <p className="mt-2 text-[11px] text-fg-faint">Geri yüklemede mevcut kayıtlar değiştirilmez; yalnızca eksik olanlar eklenir.</p>
         </Card>
       </div>
+
+      <p className="pb-6 text-center text-[11px] text-fg-faint">Rota Analiz · sürüm {__APP_VERSION__}</p>
 
       {editing && (
         <VehicleForm

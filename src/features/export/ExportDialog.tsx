@@ -4,6 +4,7 @@ import type { ExportContext, ExportOptions, MapStyleChoice } from '../../export/
 import { download, fileBase, tooShortToHide, visibleRange } from '../../export/common';
 import { getSourceBytes } from '../../storage/repo';
 import type { Selection } from '../../map/MapView';
+import { PROFILES } from '../../analysis/activity';
 
 type Format = 'pdf' | 'card-portrait' | 'card-square' | 'csv' | 'json' | 'gpx' | 'gpx-seg' | 'rota';
 
@@ -126,7 +127,7 @@ export function ExportDialog({ ctx, selection, onClose }: { ctx: ExportContext; 
                       </select>
                     </label>
                   )}
-                  {ctx.activity === 'car' && check('Araç bilgisini gizle', opt.hideVehicle, (v) => set({ hideVehicle: v }))}
+                  {PROFILES[ctx.activity].fuel && check('Araç bilgisini gizle', opt.hideVehicle, (v) => set({ hideVehicle: v }))}
                   {check('Notları dahil et', opt.includeNotes, (v) => set({ includeNotes: v }), undefined, !ctx.record.notes.trim())}
                 </div>
               </div>
@@ -148,7 +149,7 @@ export function ExportDialog({ ctx, selection, onClose }: { ctx: ExportContext; 
                   {check('Eğim dağılımı', opt.sections.grade, (v) => sec('grade', v))}
                   {check('Duraklamalar', opt.sections.stops, (v) => sec('stops', v))}
                   {check('Bölümler', opt.sections.segments, (v) => sec('segments', v), undefined, !ctx.saved.length)}
-                  {check('Yakıt', opt.sections.fuel, (v) => sec('fuel', v), undefined, ctx.activity !== 'car' || !ctx.record.fuel)}
+                  {check('Yakıt', opt.sections.fuel, (v) => sec('fuel', v), undefined, !PROFILES[ctx.activity].fuel || !ctx.record.fuel)}
                   {check('Veri kalitesi', opt.sections.quality, (v) => sec('quality', v))}
                 </div>
               </div>

@@ -3,7 +3,7 @@ import { useApp } from '../state/store';
 import { tr } from '../i18n/tr';
 
 export function TopBar() {
-  const { view, setView, openId, startImport, folderState, folderHandle, grantFolder, chooseFolder, syncFolder, setExportOpen } = useApp();
+  const { view, setView, openId, startImport, folderState, folderHandle, grantFolder, chooseFolder, syncFolder, setExportOpen, updateReady, applyUpdate } = useApp();
   const input = useRef<HTMLInputElement>(null);
 
   return (
@@ -27,6 +27,11 @@ export function TopBar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
+        {updateReady && (
+          <button onClick={() => applyUpdate?.()} className="flex h-7 items-center gap-1.5 rounded-[3px] bg-up/20 px-2.5 text-[11.5px] text-up hover:bg-up/30">
+            Yeni sürüm hazır · Yenile
+          </button>
+        )}
         <FolderBadge
           state={folderState}
           name={folderHandle?.name}

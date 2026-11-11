@@ -24,13 +24,18 @@ export function StatsView() {
   );
 
   const totals = useMemo(() => {
-    const t = { n: list.length, d: 0, time: 0, moving: 0, up: 0, cost: {} as Record<string, number> };
+    const t = { n: list.length, d: 0, time: 0, moving: 0, up: 0, cost: {} as Record<string, number>, missing: 0 };
     for (const r of list) {
       t.d += r.metrics.distanceM;
       t.time += r.metrics.elapsedSec ?? 0;
       t.moving += r.metrics.movingSec ?? 0;
       t.up += r.metrics.ascentM ?? 0;
-      if (r.activity === 'car' && r.fuel?.totalCost) t.cost[r.fuel.currency] = (t.cost[r.fuel.currency] ?? 0) + r.fuel.totalCost;
+      if (r.activity === 'car' || r.activity === 'moto') {
+        const day = (r.metrics.startTime ?? r.createdAt) + 864e5;
+        // Yalnızca rota tarihine ait fiyatla hesaplanmış masraflar toplanır
+        if (r.fuel?.totalCost && r.fuel.priceDate != null && r.fuel.priceDate <= day) t.cost[r.fuel.currency] = (t.cost[r.fuel.currency] ?? 0) + r.fuel.totalCost;
+        else t.missing++;
+      }
     }
     return t;
   }, [list]);
@@ -141,11 +146,12 @@ export function StatsView() {
             ['Toplam mesafe', fmtKm(totals.d)],
             ['Toplam süre', fmtDuration(totals.time)],
             ['Toplam tırmanış', fmtM(totals.up)],
-            ['Yakıt ve masraf', costText],
-          ].map(([k, v]) => (
+            ['Yakıt ve masraf', costText, totals.missing ? `${totals.missing} araç rotasında fiyat eksik/tarihi uyumsuz` : ''],
+          ].map(([k, v, note]) => (
             <div key={k} className="bg-ink-850 px-4 py-3">
               <div className="text-[11px] text-fg-muted">{k}</div>
               <div className="tnum text-[19px] font-medium">{v}</div>
+              {note && <div className="text-[10.5px] text-amber">{note}</div>}
             </div>
           ))}
         </div>

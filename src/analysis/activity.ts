@@ -14,6 +14,7 @@ export const PROFILES: Record<ActivityType, ActivityProfile> = {
   run: { stopSpeedKmh: 2, gradeWindowM: 50, maxPlausibleKmh: 30, showPace: true, fuel: false },
   bike: { stopSpeedKmh: 2, gradeWindowM: 100, maxPlausibleKmh: 90, showPace: false, fuel: false },
   car: { stopSpeedKmh: 3, gradeWindowM: 100, maxPlausibleKmh: 250, showPace: false, fuel: true },
+  moto: { stopSpeedKmh: 3, gradeWindowM: 100, maxPlausibleKmh: 250, showPace: false, fuel: true },
 };
 
 /** Genel analiz ayarları (Bölüm 6). */

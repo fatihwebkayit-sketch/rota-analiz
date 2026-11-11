@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Currency, ExtraCost, RouteFuel, RouteRecord } from '../../core/types';
 import { useApp } from '../../state/store';
 import { computeFuel } from '../../analysis/fuel';
-import { CURRENCY_SYMBOL, FUEL_LABEL, latestPrice, unitOf } from '../../storage/settings';
-import { fmt1, fmt2 } from '../../core/format';
-import { upsertVehicle, VehicleForm, vehicleLabel } from '../settings/VehicleForm';
+import { CURRENCY_SYMBOL, FUEL_LABEL, priceAt, unitOf } from '../../storage/settings';
+import { fmt1, fmt2, fmtDate } from '../../core/format';
+import { kindOf, upsertVehicle, VehicleForm, vehicleLabel } from '../settings/VehicleForm';
 
 const money = (v: number, c: Currency) =>
   `${CURRENCY_SYMBOL[c]}${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)}`;
@@ -14,24 +14,28 @@ const parse = (v: string) => {
 };
 
 export function FuelPanel({ record, distanceM, onChange }: { record: RouteRecord; distanceM: number; onChange(f: RouteFuel): void }) {
-  const { vehicles, fuelPrices, saveVehicles, setView } = useApp();
-  const active = vehicles.filter((v) => !v.archived);
+  const { vehicles, fuelPrices, saveVehicles, addFuelPrice, toast } = useApp();
+  const wantKind = record.activity === 'moto' ? 'moto' : 'car';
+  // Rotanın türüne uyan araçlar önce gelir
+  const active = vehicles.filter((v) => !v.archived).sort((a, b) => Number(kindOf(b) === wantKind) - Number(kindOf(a) === wantKind));
+  const routeDate = record.metrics.startTime ?? record.createdAt;
   const [adding, setAdding] = useState(false);
 
   // Başlangıç değerleri: kayıttaki varsayımlar, yoksa varsayılan araç + son fiyat
   const initial = useMemo<RouteFuel | null>(() => {
     if (record.fuel) return record.fuel;
-    const v = active.find((x) => x.isDefault) ?? active[0];
+    const v = active.find((x) => x.isDefault && kindOf(x) === wantKind) ?? active.find((x) => kindOf(x) === wantKind) ?? active[0];
     if (!v) return null;
-    const lp = latestPrice(fuelPrices, v.fuel);
-    return { vehicleId: v.id, vehicleLabel: vehicleLabel(v), fuel: v.fuel, consumption: v.avg, price: lp?.price ?? 0, currency: lp?.currency ?? 'TRY', roundTrip: false, persons: 1, extras: [] };
+    // Yalnızca rota tarihinde geçerli olan fiyat kullanılır; yoksa kullanıcıya sorulur
+    const p = priceAt(fuelPrices, v.fuel, routeDate);
+    return { vehicleId: v.id, vehicleLabel: vehicleLabel(v), fuel: v.fuel, consumption: v.avg, price: p?.price ?? 0, currency: p?.currency ?? 'TRY', priceDate: p?.date, priceSource: p ? 'history' : undefined, roundTrip: false, persons: 1, extras: [] };
   }, [record.id, record.fuel, vehicles.length, fuelPrices.length]);
 
   const [f, setF] = useState<RouteFuel | null>(initial);
   const [txt, setTxt] = useState({ consumption: '', price: '' });
   useEffect(() => {
     setF(initial);
-    setTxt({ consumption: initial ? fmt2(initial.consumption) : '', price: initial ? fmt2(initial.price) : '' });
+    setTxt({ consumption: initial ? fmt2(initial.consumption) : '', price: initial?.price ? fmt2(initial.price) : '' });
   }, [record.id, initial?.vehicleId, record.fuel === undefined]);
 
   // Kayıtta henüz varsayım yoksa ve fiyat biliniyorsa varsayılanlar bir kez kaydedilir (istatistikler için)
@@ -79,9 +83,12 @@ export function FuelPanel({ record, distanceM, onChange }: { record: RouteRecord
   };
   function chooseVehicleObj(v: (typeof vehicles)[number]) {
     if (!f) return;
-    const lp = latestPrice(fuelPrices, v.fuel);
-    const next = { ...f, vehicleId: v.id, vehicleLabel: vehicleLabel(v), fuel: v.fuel, consumption: v.avg, price: lp?.price ?? f.price, currency: lp?.currency ?? f.currency };
-    setTxt({ consumption: fmt2(next.consumption), price: fmt2(next.price) });
+    const p = priceAt(fuelPrices, v.fuel, routeDate);
+    const sameFuel = v.fuel === f.fuel;
+    const next: RouteFuel = p
+      ? { ...f, vehicleId: v.id, vehicleLabel: vehicleLabel(v), fuel: v.fuel, consumption: v.avg, price: p.price, currency: p.currency, priceDate: p.date, priceSource: 'history' }
+      : { ...f, vehicleId: v.id, vehicleLabel: vehicleLabel(v), fuel: v.fuel, consumption: v.avg, price: sameFuel ? f.price : 0, priceDate: sameFuel ? f.priceDate : undefined, priceSource: sameFuel ? f.priceSource : undefined };
+    setTxt({ consumption: fmt2(next.consumption), price: next.price ? fmt2(next.price) : '' });
     commit(next);
   }
   const setExtra = (i: number, p: Partial<ExtraCost>) => commit({ ...f, extras: f.extras.map((e, k) => (k === i ? { ...e, ...p } : e)) });
@@ -102,16 +109,43 @@ export function FuelPanel({ record, distanceM, onChange }: { record: RouteRecord
             onChange={(e) => { setTxt((t) => ({ ...t, consumption: e.target.value })); const v = parse(e.target.value); if (v > 0) commit({ ...f, consumption: v }); }} />
         </label>
         <label>
-          <span className="mb-0.5 block text-[11px] text-fg-muted">{FUEL_LABEL[f.fuel]} fiyatı ({CURRENCY_SYMBOL[f.currency]}/{u})</span>
+          <span className="mb-0.5 block text-[11px] text-fg-muted">{FUEL_LABEL[f.fuel]} fiyatı ({CURRENCY_SYMBOL[f.currency]}/{u}) · {fmtDate(routeDate)}</span>
           <input className="ra-input w-full tnum" inputMode="decimal" value={txt.price}
-            onChange={(e) => { setTxt((t) => ({ ...t, price: e.target.value })); const v = parse(e.target.value); if (v >= 0) commit({ ...f, price: v }); }} />
+            onChange={(e) => { setTxt((t) => ({ ...t, price: e.target.value })); const v = parse(e.target.value); if (v >= 0) commit({ ...f, price: v, priceDate: routeDate, priceSource: 'manual' }); }} />
         </label>
       </div>
-      {!f.price && (
-        <p className="text-[11px] text-amber">
-          Yakıt fiyatı girilmedi. Buraya yazabilir ya da <button className="underline" onClick={() => setView('settings')}>Ayarlar</button>'dan kaydedebilirsiniz.
-        </p>
-      )}
+      {(() => {
+        const dayEnd = routeDate + 864e5;
+        if (!f.price)
+          return (
+            <div className="rounded-[3px] border border-amber/40 bg-amber-soft px-2.5 py-2 text-[11.5px] leading-snug text-amber">
+              Bu rota <b>{fmtDate(routeDate)}</b> tarihli. Fiyat geçmişinde bu tarihe ait {FUEL_LABEL[f.fuel].toLocaleLowerCase('tr-TR')} fiyatı yok. Rota tarihindeki fiyatı yukarıya yazın; doğru bir maliyet için güncel fiyat kullanılmaz.
+            </div>
+          );
+        if (f.priceDate != null && f.priceDate > dayEnd)
+          return (
+            <div className="rounded-[3px] border border-amber/40 bg-amber-soft px-2.5 py-2 text-[11.5px] leading-snug text-amber">
+              Kullanılan fiyat {fmtDate(f.priceDate)} tarihli, rota ise {fmtDate(routeDate)} tarihli. Rota tarihindeki fiyatı girin.
+            </div>
+          );
+        if (f.priceDate == null)
+          return (
+            <div className="rounded-[3px] border border-amber/40 bg-amber-soft px-2.5 py-2 text-[11.5px] leading-snug text-amber">
+              Bu fiyatın hangi tarihe ait olduğu bilinmiyor (rota: {fmtDate(routeDate)}). Rota tarihindeki fiyatsa onaylayın, değilse düzeltin.
+              <button className="ml-1 underline" onClick={() => commit({ ...f, priceDate: routeDate, priceSource: 'manual' })}>Fiyat doğru</button>
+            </div>
+          );
+        if (f.priceSource === 'manual' && !fuelPrices.some((p) => p.fuel === (f.fuel === 'hibrit' ? 'benzin' : f.fuel) && Math.abs(p.date - routeDate) < 864e5 && Math.abs(p.price - f.price) < 0.005))
+          return (
+            <button
+              className="text-left text-[11px] text-fg-faint hover:text-fg"
+              onClick={() => { addFuelPrice({ fuel: f.fuel === 'hibrit' ? 'benzin' : f.fuel, price: f.price, currency: f.currency, date: routeDate }); toast(`Fiyat ${fmtDate(routeDate)} tarihiyle geçmişe eklendi`); }}
+            >
+              + Bu fiyatı {fmtDate(routeDate)} tarihiyle fiyat geçmişine ekle (o dönemin diğer rotalarında da kullanılır)
+            </button>
+          );
+        return <p className="text-[10.5px] text-fg-faint">Fiyat: {fmtDate(f.priceDate)} tarihli kayıttan.</p>;
+      })()}
       <div className="flex items-center gap-3">
         <div className="inline-flex overflow-hidden rounded-[3px] border border-ink-600">
           <button className="ra-seg h-6 px-2 text-[11px]" aria-pressed={!f.roundTrip} onClick={() => commit({ ...f, roundTrip: false })}>Tek yön</button>

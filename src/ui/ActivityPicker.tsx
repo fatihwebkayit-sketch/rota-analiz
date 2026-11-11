@@ -1,7 +1,7 @@
 import type { ActivityType } from '../core/types';
 import { tr } from '../i18n/tr';
 
-export const ACTIVITIES: ActivityType[] = ['car', 'walk', 'run', 'bike'];
+export const ACTIVITIES: ActivityType[] = ['car', 'moto', 'walk', 'run', 'bike'];
 
 export function ActivityPicker({ value, onChange, compact }: { value: ActivityType | null; onChange(a: ActivityType): void; compact?: boolean }) {
   return (

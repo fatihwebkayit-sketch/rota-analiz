@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Rota Analiz',
@@ -35,5 +35,6 @@ export default defineConfig({
     }),
   ],
   worker: { format: 'es' },
+  define: { __APP_VERSION__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
   test: { environment: 'node' },
 } as any);

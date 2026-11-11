@@ -29,6 +29,8 @@ interface AppState {
   prefs: Prefs;
   compareIds: string[];
   exportOpen: boolean;
+  updateReady: boolean;
+  applyUpdate?: () => void;
   setExportOpen(v: boolean): void;
 
   init(): Promise<void>;
@@ -89,6 +91,7 @@ export const useApp = create<AppState>((set, get) => ({
   prefs: settings.DEFAULT_PREFS,
   compareIds: [],
   exportOpen: false,
+  updateReady: false,
   setExportOpen(v) { set({ exportOpen: v }); },
 
   async init() {

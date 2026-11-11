@@ -13,6 +13,7 @@ const str = (v?: number) => (v == null ? '' : String(v).replace('.', ','));
 export function VehicleForm({ initial, onSave, onClose }: { initial?: Vehicle; onSave(v: Vehicle): void; onClose(): void }) {
   const [f, setF] = useState({
     nickname: initial?.nickname ?? '',
+    kind: initial?.kind ?? ('car' as 'car' | 'moto'),
     brand: initial?.brand ?? '',
     model: initial?.model ?? '',
     year: str(initial?.year),
@@ -33,6 +34,7 @@ export function VehicleForm({ initial, onSave, onClose }: { initial?: Vehicle; o
     if (!valid) return;
     onSave({
       id: initial?.id ?? newId(),
+      kind: f.kind,
       nickname: f.nickname.trim(),
       brand: f.brand.trim(),
       model: f.model.trim(),
@@ -61,7 +63,15 @@ export function VehicleForm({ initial, onSave, onClose }: { initial?: Vehicle; o
       <div className="w-[min(560px,94vw)] rounded-[4px] border border-ink-600 bg-ink-850 shadow-2xl">
         <div className="border-b border-ink-700 px-4 py-2.5 text-[13px] font-semibold">{initial ? 'Aracı düzenle' : 'Araç ekle'}</div>
         <div className="grid grid-cols-2 gap-3 px-4 py-4">
-          <div className="col-span-2">{field('Takma ad *', <input autoFocus className="ra-input w-full" placeholder="ör. Beyaz Egea" value={f.nickname} onChange={(e) => set('nickname', e.target.value)} />)}</div>
+          <div className="col-span-2 grid grid-cols-[1fr_auto] gap-3">
+            {field('Takma ad *', <input autoFocus className="ra-input w-full" placeholder="ör. Beyaz Egea" value={f.nickname} onChange={(e) => set('nickname', e.target.value)} />)}
+            {field('Tip', (
+              <div className="inline-flex overflow-hidden rounded-[3px] border border-ink-600">
+                <button type="button" className="ra-seg" aria-pressed={f.kind === 'car'} onClick={() => set('kind', 'car')}>Otomobil</button>
+                <button type="button" className="ra-seg border-l border-ink-600" aria-pressed={f.kind === 'moto'} onClick={() => set('kind', 'moto')}>Motosiklet</button>
+              </div>
+            ))}
+          </div>
           {field('Marka', <input className="ra-input w-full" value={f.brand} onChange={(e) => set('brand', e.target.value)} />)}
           {field('Model', <input className="ra-input w-full" value={f.model} onChange={(e) => set('model', e.target.value)} />)}
           {field('Model yılı', <input className="ra-input w-full tnum" inputMode="numeric" value={f.year} onChange={(e) => set('year', e.target.value)} />)}
@@ -92,9 +102,12 @@ export function VehicleForm({ initial, onSave, onClose }: { initial?: Vehicle; o
 /** Varsayılan bayrağı tek araçta kalacak şekilde listeyi günceller. */
 export function upsertVehicle(list: Vehicle[], v: Vehicle): Vehicle[] {
   let out = list.some((x) => x.id === v.id) ? list.map((x) => (x.id === v.id ? v : x)) : [...list, v];
-  if (v.isDefault) out = out.map((x) => (x.id === v.id ? x : { ...x, isDefault: false }));
+  if (v.isDefault) out = out.map((x) => (x.id === v.id || (x.kind ?? 'car') !== (v.kind ?? 'car') ? x : { ...x, isDefault: false }));
   else if (!out.some((x) => x.isDefault && !x.archived) && out.filter((x) => !x.archived).length === 1) out = out.map((x) => ({ ...x, isDefault: !x.archived }));
   return out;
 }
 
 export const vehicleLabel = (v: Vehicle) => [v.nickname, [v.brand, v.model].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+
+/** Varsayılan bayrağı tipe göre (otomobil/motosiklet) ayrı tutulur. */
+export const kindOf = (v: Vehicle) => v.kind ?? 'car';

@@ -1,6 +1,6 @@
 // Rota Analiz — temel veri modeli
 
-export type ActivityType = 'car' | 'walk' | 'run' | 'bike';
+export type ActivityType = 'car' | 'moto' | 'walk' | 'run' | 'bike';
 export type SourceFormat = 'gpx' | 'kml' | 'kmz' | 'geojson' | 'tcx' | 'fit';
 
 /** Ayrıştırıcıdan çıkan tek bir iz parçası. Eksik değerler null kalır, asla uydurulmaz. */
@@ -118,6 +118,7 @@ export type Currency = 'TRY' | 'EUR' | 'USD';
 
 export interface Vehicle {
   id: string;
+  kind?: 'car' | 'moto'; // yoksa otomobil
   nickname: string;
   brand: string;
   model: string;
@@ -152,6 +153,9 @@ export interface RouteFuel {
   roundTrip: boolean;
   persons: number;
   extras: ExtraCost[];
+  /** Fiyatın geçerli olduğu tarih (rota tarihiyle karşılaştırmak için) ve kaynağı */
+  priceDate?: number;
+  priceSource?: 'history' | 'manual';
   totalCost?: number; // istatistikler için hesaplanmış toplam
   computedAt?: number;
 }

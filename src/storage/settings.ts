@@ -85,6 +85,16 @@ export const FUEL_LABEL: Record<Vehicle['fuel'], string> = {
 export const unitOf = (f: Vehicle['fuel']) => (f === 'elektrik' ? 'kWh' : 'L');
 export const CURRENCY_SYMBOL = { TRY: '₺', EUR: '€', USD: '$' } as const;
 
+/**
+ * Rota tarihinde geçerli fiyat: o günün sonuna kadar girilmiş en son fiyat.
+ * Rotadan sonra girilmiş fiyatlar kullanılmaz (2025 rotasına 2026 fiyatı uygulanmaz).
+ */
+export function priceAt(prices: FuelPrice[], fuel: Vehicle['fuel'], when: number): FuelPrice | undefined {
+  const key = fuel === 'hibrit' ? 'benzin' : fuel;
+  const endOfDay = when + 864e5;
+  return prices.filter((p) => p.fuel === key && p.date <= endOfDay).sort((a, b) => b.date - a.date)[0];
+}
+
 /** Bir yakıt türü için en son girilen fiyat. */
 export function latestPrice(prices: FuelPrice[], fuel: Vehicle['fuel']): FuelPrice | undefined {
   const key = fuel === 'hibrit' ? 'benzin' : fuel;

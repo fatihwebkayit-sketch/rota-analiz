@@ -33,4 +33,4 @@ export function useEChart(option: any, onClick?: (p: any) => void) {
 
 export const CHART_TEXT = { color: '#9a9ca1', fontSize: 10.5 };
 export const TOOLTIP = { backgroundColor: 'rgba(19,20,21,0.95)', borderColor: '#33363b', textStyle: { color: '#e7e5e0', fontSize: 11.5 } };
-export const ACT_COLORS = { car: '#f0a03c', walk: '#5fb57f', run: '#c792ea', bike: '#5aa9e6' } as const;
+export const ACT_COLORS = { car: '#f0a03c', moto: '#e6c35a', walk: '#5fb57f', run: '#c792ea', bike: '#5aa9e6' } as const;

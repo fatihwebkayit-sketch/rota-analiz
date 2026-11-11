@@ -93,3 +93,18 @@ describe('yakıt hesabı', () => {
     expect(r2.perKm).toBeCloseTo((585 + 57.5) / 200, 5);
   });
 });
+
+import { priceAt } from '../src/storage/settings';
+describe('rota tarihine göre yakıt fiyatı', () => {
+  const d = (s: string) => new Date(s + 'T12:00:00+03:00').getTime();
+  const prices = [
+    { fuel: 'benzin' as const, price: 42, currency: 'TRY' as const, date: d('2025-03-01') },
+    { fuel: 'benzin' as const, price: 76.4, currency: 'TRY' as const, date: d('2026-11-11') },
+  ];
+  it('rotadan sonraki fiyat kullanılmaz', () => {
+    expect(priceAt(prices, 'benzin', d('2025-06-21'))?.price).toBe(42);
+    expect(priceAt(prices, 'benzin', d('2026-11-11'))?.price).toBe(76.4);
+    expect(priceAt(prices, 'benzin', d('2024-12-01'))).toBeUndefined();
+    expect(priceAt(prices, 'hibrit', d('2025-06-21'))?.price).toBe(42);
+  });
+});
