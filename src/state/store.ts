@@ -105,10 +105,11 @@ export const useApp = create<AppState>((set, get) => ({
       await get().syncFolder();
     } catch (e) {
       const err = e as Error;
+      console.warn('Klasör seçimi hatası', err?.name, err?.message);
       if (err?.name === 'AbortError')
-        get().toast('Klasör seçimi tamamlanmadı. Klasörü seçip “Klasör seç”e basın; Chrome düzenleme izni sorarsa “Dosyaları düzenle”yi onaylayın. Sürücünün kendisini (G:\\) değil, içindeki Rotalarım klasörünü seçin.', 'error');
+        get().toast(`Klasör seçimi tamamlanmadı (Chrome: “${err.message}”). Düzenleme izni engellenmiş olabilir: adres çubuğundaki site bilgisi simgesinden “Dosya düzenleme” iznini “Sor” veya “İzin ver” yapın.`, 'error');
       else if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError')
-        get().toast('Chrome bu klasöre erişime izin vermedi. Sistem klasörü veya sürücü kökü olmayan bir klasör seçin (ör. G:\\Drive\'ım\\Rotalarım).', 'error');
+        get().toast(`Chrome klasör erişimine izin vermedi (${err.name}: ${err.message}).`, 'error');
       else get().toast(`Klasör seçilemedi (${err?.name ?? 'hata'}): ${err?.message ?? err}`, 'error');
     }
   },
