@@ -64,6 +64,7 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
   const mapRef = useRef<MLMap | null>(null);
   const styleReady = useRef(false);
   const lastTip = useRef(0);
+  const fellBack = useRef(false);
   const markers = useRef<maplibregl.Marker[]>([]);
   const selMarkers = useRef<maplibregl.Marker[]>([]);
   const { baseLayer, hillshade, terrain3d, toast } = useApp();
@@ -103,12 +104,12 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
       styleReady.current = true;
       setStyleTick((t) => t + 1);
     });
-    let fellBack = false;
     map.on('error', (e: any) => {
-      if (fellBack || styleReady.current) return;
-      fellBack = true;
+      // Yalnızca stil dosyasının kendisi yüklenemezse boş zemine geç (tek tek karo hataları değil)
+      if (fellBack.current || styleReady.current || e?.sourceId || e?.tile) return;
+      fellBack.current = true;
       console.warn('Harita altlığı yüklenemedi', e?.error?.message);
-      map.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#16171a' } }] });
+      map.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#16171a' } }] }, { diff: false });
       useApp.getState().toast('Harita altlığı yüklenemedi (internet bağlantısını kontrol edin). Rota boş zemin üzerinde gösteriliyor.', 'error');
     });
     mapRef.current = map;
@@ -211,7 +212,10 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
   useEffect(() => {
     if (firstStyle.current) { firstStyle.current = false; return; }
     styleReady.current = false;
-    mapRef.current?.setStyle(baseStyle(baseLayer) as any);
+    fellBack.current = false;
+    // diff:false → stil tamamen yeniden kurulur ve 'style.load' her zaman tetiklenir;
+    // rota, seçim ve imleç katmanları bu olayda yeniden eklenir.
+    mapRef.current?.setStyle(baseStyle(baseLayer) as any, { diff: false });
   }, [baseLayer]);
 
   // Kabartma, 3B arazi ve rota katmanları (her stil yüklemesinde yeniden kurulur)

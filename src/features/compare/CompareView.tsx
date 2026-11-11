@@ -67,7 +67,7 @@ export function CompareView() {
     map.on('error', () => {
       if (drawn) return;
       drawn = true;
-      map.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#16171a' } }] });
+      map.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#16171a' } }] }, { diff: false });
     });
     return () => map.remove();
   }, [items, baseLayer]);
