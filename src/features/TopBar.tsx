@@ -3,7 +3,7 @@ import { useApp } from '../state/store';
 import { tr } from '../i18n/tr';
 
 export function TopBar() {
-  const { view, setView, openId, startImport, folderState, folderHandle, grantFolder, chooseFolder, syncFolder } = useApp();
+  const { view, setView, openId, startImport, folderState, folderHandle, grantFolder, chooseFolder, syncFolder, setExportOpen } = useApp();
   const input = useRef<HTMLInputElement>(null);
 
   return (
@@ -38,7 +38,7 @@ export function TopBar() {
           ref={input}
           type="file"
           multiple
-          accept=".gpx,.kml,.kmz,.geojson,.json,.tcx,.fit"
+          accept=".gpx,.kml,.kmz,.rota,.geojson,.json,.tcx,.fit"
           className="hidden"
           onChange={(e) => {
             const files = [...(e.target.files ?? [])];
@@ -46,6 +46,12 @@ export function TopBar() {
             if (files.length) startImport(files);
           }}
         />
+        {view === 'analysis' && openId && (
+          <button className="ra-btn" onClick={() => setExportOpen(true)} title="PDF rapor, paylaşım kartı, CSV, GPX…">
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2.5 10.5v3h11v-3" /></svg>
+            Rapor / Dışa aktar
+          </button>
+        )}
         <button className="ra-btn-primary" onClick={() => input.current?.click()}>
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2.5 10.5v3h11v-3" /></svg>
           {tr.actions.import}

@@ -28,6 +28,8 @@ interface AppState {
   fuelPrices: FuelPrice[];
   prefs: Prefs;
   compareIds: string[];
+  exportOpen: boolean;
+  setExportOpen(v: boolean): void;
 
   init(): Promise<void>;
   saveVehicles(items: Vehicle[]): Promise<void>;
@@ -86,6 +88,8 @@ export const useApp = create<AppState>((set, get) => ({
   fuelPrices: [],
   prefs: settings.DEFAULT_PREFS,
   compareIds: [],
+  exportOpen: false,
+  setExportOpen(v) { set({ exportOpen: v }); },
 
   async init() {
     const local = await settings.loadLocal();

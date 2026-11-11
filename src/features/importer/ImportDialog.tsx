@@ -7,6 +7,7 @@ import { fmtDateTime } from '../../core/format';
 import { tr } from '../../i18n/tr';
 import { ActivityPicker } from '../../ui/ActivityPicker';
 import { placeNamesFor } from '../../core/geocode';
+import JSZip from 'jszip';
 
 interface Item {
   key: string;
@@ -21,6 +22,9 @@ interface Item {
   duplicateOf?: string;
   firstTime?: number | null;
   points?: number;
+  /** .rota paylaşım paketinden gelen kayıt bilgileri */
+  pkg?: Partial<RouteRecord>;
+  srcName?: string;
 }
 
 export function ImportDialog() {
@@ -34,8 +38,20 @@ export function ImportDialog() {
   useEffect(() => {
     items.forEach(async (it) => {
       try {
-        const bytes = await it.file.arrayBuffer();
-        const { parsed, sha256 } = await parseInWorker(it.file.name, bytes);
+        let bytes = await it.file.arrayBuffer();
+        let srcName = it.file.name;
+        let pkg: Partial<RouteRecord> | undefined;
+        if (/\.rota$/i.test(it.file.name)) {
+          const zip = await JSZip.loadAsync(bytes);
+          const info = JSON.parse(await zip.file('rota.json')!.async('string'));
+          if (info?.tur !== 'rota-analiz-paketi') throw new Error('Geçerli bir Rota Analiz paketi değil.');
+          const src = Object.values(zip.files).find((f) => !f.dir && f.name.startsWith('kaynak/'));
+          if (!src) throw new Error('Pakette rota dosyası yok.');
+          bytes = await src.async('arraybuffer');
+          srcName = src.name.replace(/^kaynak\//, '');
+          pkg = info.kayit;
+        }
+        const { parsed, sha256 } = await parseInWorker(srcName, bytes);
         const dup = findDuplicate(records, sha256);
         let first: number | null = null, n = 0;
         for (const t of parsed.tracks)
@@ -43,7 +59,9 @@ export function ImportDialog() {
             n += s.lat.length;
             if (first == null) first = s.time.find((x) => x != null) ?? null;
           }
-        patch(it.key, { status: 'ready', parsed, bytes, sha256, name: parsed.name || it.name, duplicateOf: dup?.name, firstTime: first, points: n });
+        // Paketten gelen bölümler yalnızca kaynak dosya aynıysa geçerlidir (nokta indeksleri)
+        if (pkg && pkg.source?.sha256 !== sha256) pkg = { ...pkg, segments: undefined };
+        patch(it.key, { status: 'ready', parsed, bytes, sha256, srcName, pkg, name: pkg?.name || parsed.name || it.name, activity: (pkg?.activity as ActivityType) ?? null, duplicateOf: dup?.name, firstTime: first, points: n });
       } catch (e) {
         patch(it.key, { status: 'error', error: (e as Error).message });
       }
@@ -72,12 +90,14 @@ export function ImportDialog() {
           activity: it.activity,
           createdAt: now,
           updatedAt: now,
-          startPlace: '',
-          endPlace: '',
-          tags: [],
-          notes: '',
+          startPlace: it.pkg?.startPlace ?? '',
+          endPlace: it.pkg?.endPlace ?? '',
+          tags: it.pkg?.tags ?? [],
+          notes: it.pkg?.notes ?? '',
+          segments: it.pkg?.segments,
+          fuel: it.pkg?.fuel ? { ...it.pkg.fuel, vehicleId: undefined } : undefined,
           source: {
-            fileName: it.file.name,
+            fileName: it.srcName ?? it.file.name,
             format: it.parsed.format,
             sha256: it.sha256!,
             size: it.bytes.byteLength,
