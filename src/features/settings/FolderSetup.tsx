@@ -3,8 +3,26 @@ import { tr } from '../../i18n/tr';
 
 /** İlk açılışta veri klasörü seçimi (yalnızca klasör desteklenen ve henüz seçilmemiş durumda). */
 export function FolderSetup() {
-  const { folderState, folderSetupSeen, chooseFolder, dismissFolderSetup, records } = useApp();
-  if (folderSetupSeen || folderState !== 'none') return null;
+  const { folderState, folderSetupSeen, chooseFolder, grantFolder, dismissFolderSetup, records, folderHandle } = useApp();
+  if (folderSetupSeen) return null;
+  if (folderState === 'prompt' && folderHandle)
+    return (
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-950/75">
+        <div className="w-[min(520px,92vw)] rounded-[4px] border border-ink-600 bg-ink-850 p-5 shadow-2xl">
+          <div className="ra-label">Adım 2 / 2</div>
+          <h2 className="mt-1 text-[15px] font-semibold">Klasöre kaydetme izni</h2>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-fg-muted">
+            Seçilen klasör: <span className="font-mono text-fg">{folderHandle.name}</span>. Rotaları bu klasöre kaydedebilmek için Chrome'un düzenleme iznine ihtiyaç var.
+          </p>
+          <p className="mt-2 text-[12px] text-fg-muted">Aşağıdaki düğmeye basınca Chrome bir izin penceresi açar; <span className="text-fg">Dosyaları düzenle</span> (veya <span className="text-fg">Her ziyarette izin ver</span>) seçin.</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button className="ra-btn" onClick={chooseFolder}>Başka klasör seç</button>
+            <button className="ra-btn-primary" onClick={grantFolder}>Düzenleme izni ver</button>
+          </div>
+        </div>
+      </div>
+    );
+  if (folderState !== 'none') return null;
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-950/75">
       <div className="w-[min(520px,92vw)] rounded-[4px] border border-ink-600 bg-ink-850 p-5 shadow-2xl">

@@ -98,28 +98,40 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async chooseFolder() {
+    let h: FileSystemDirectoryHandle;
     try {
-      const h = await folder.pickFolder();
-      set({ folderHandle: h, folderState: 'granted', folderSetupSeen: true });
-      savePref('folderSetupSeen', true);
-      await get().syncFolder();
+      h = await folder.pickFolder();
     } catch (e) {
       const err = e as Error;
       console.warn('Klasör seçimi hatası', err?.name, err?.message);
-      if (err?.name === 'AbortError')
-        get().toast(`Klasör seçimi tamamlanmadı (Chrome: “${err.message}”). Düzenleme izni engellenmiş olabilir: adres çubuğundaki site bilgisi simgesinden “Dosya düzenleme” iznini “Sor” veya “İzin ver” yapın.`, 'error');
-      else if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError')
-        get().toast(`Chrome klasör erişimine izin vermedi (${err.name}: ${err.message}).`, 'error');
+      if (err?.name === 'AbortError') get().toast(`Klasör seçilmedi (Chrome: “${err.message}”).`, 'error');
       else get().toast(`Klasör seçilemedi (${err?.name ?? 'hata'}): ${err?.message ?? err}`, 'error');
+      return;
     }
+    const st = await folder.folderState(h);
+    set({ folderHandle: h, folderState: st });
+    if (st === 'granted') {
+      set({ folderSetupSeen: true });
+      savePref('folderSetupSeen', true);
+      await get().syncFolder();
+    }
+    // 'prompt' ise FolderSetup ikinci adımı (düzenleme izni) gösterir
   },
 
   async grantFolder() {
     const h = get().folderHandle;
     if (!h) return;
-    if (await folder.requestAccess(h)) {
-      set({ folderState: 'granted' });
-      await get().syncFolder();
+    try {
+      const res = await folder.requestAccess(h);
+      if (res === 'granted') {
+        set({ folderState: 'granted', folderSetupSeen: true });
+        savePref('folderSetupSeen', true);
+        await get().syncFolder();
+        get().toast(`Veri klasörü bağlandı: ${h.name}`);
+      } else get().toast(`Düzenleme izni verilmedi (Chrome yanıtı: ${res}).`, 'error');
+    } catch (e) {
+      const err = e as Error;
+      get().toast(`Düzenleme izni istenemedi (${err?.name}: ${err?.message}).`, 'error');
     }
   },
 

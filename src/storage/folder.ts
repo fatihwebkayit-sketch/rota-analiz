@@ -22,15 +22,16 @@ export async function folderState(h?: FileSystemDirectoryHandle): Promise<Folder
   return p === 'granted' ? 'granted' : 'prompt';
 }
 
+/** Klasör seçimi iki adımlıdır: önce okuma (seçim), sonra ayrı bir tıklamayla düzenleme izni. */
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
-  const h: FileSystemDirectoryHandle = await (window as any).showDirectoryPicker({ id: 'rota-analiz', mode: 'readwrite', startIn: 'documents' });
+  const h: FileSystemDirectoryHandle = await (window as any).showDirectoryPicker({ id: 'rotaanaliz', startIn: 'documents' });
   await kvSet(KEY, h);
   return h;
 }
 
 /** Kullanıcı hareketiyle çağrılmalı (düğme tıklaması). */
-export async function requestAccess(h: FileSystemDirectoryHandle) {
-  return (await (h as any).requestPermission({ mode: 'readwrite' })) === 'granted';
+export async function requestAccess(h: FileSystemDirectoryHandle): Promise<string> {
+  return (await (h as any).requestPermission({ mode: 'readwrite' })) as string;
 }
 
 export function folderNameFor(r: RouteRecord) {
