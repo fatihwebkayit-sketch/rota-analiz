@@ -50,9 +50,9 @@ export function PointTooltip({ result, grade, idx, x, y, pinned, activity, onClo
   rows.push(['Eğim', isFinite(g) ? `%${fmt1(g)}` : '—']);
   rows.push(['Rakım değişimi', dEle == null ? '—' : `${dEle >= 0 ? '+' : ''}${fmt1(dEle)} m`]);
 
-  // Ekran kenarına taşmasın
-  const left = x > window.innerWidth - 620 ? x - 246 : x + 16;
-  const top = Math.max(8, Math.min(y - 20, window.innerHeight - 330));
+  // Konum MapView tarafından rotayla çakışmayacak şekilde hesaplanır (x, y = kutunun sol üst köşesi)
+  const left = x;
+  const top = y;
 
   return (
     <div className={`ra-tooltip absolute z-20 w-[230px] ${pinned ? '' : 'pointer-events-none'}`} style={{ left, top }}>
@@ -76,7 +76,7 @@ export function PointTooltip({ result, grade, idx, x, y, pinned, activity, onClo
       </dl>
       {pinned ? (
         <div className="flex gap-1.5 border-t border-ink-600 px-2.5 py-1.5">
-          <button className="ra-chip" onClick={copy}>{copied ? tr.actions.copied : 'Koordinatı kopyala'}</button>
+          <button className="ra-chip" onClick={copy}>{copied ? tr.actions.copied : 'Kopyala'}</button>
           <a className="ra-chip" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${lat},${lon}`}>Haritalar</a>
           <a className="ra-chip" target="_blank" rel="noreferrer" href={`https://earth.google.com/web/search/${lat},${lon}`}>Earth</a>
         </div>

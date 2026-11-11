@@ -63,6 +63,7 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const styleReady = useRef(false);
+  const lastTip = useRef(0);
   const markers = useRef<maplibregl.Marker[]>([]);
   const selMarkers = useRef<maplibregl.Marker[]>([]);
   const { baseLayer, hillshade, terrain3d, toast } = useApp();
@@ -312,6 +313,40 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
     src.setData(fc(cursorIdx != null ? [pt(result.route, cursorIdx)] : []));
   }, [cursorIdx, result, styleTick]);
 
+  /**
+   * Bilgi kutusunu rotayla en az çakışacak yere yerleştirir: noktanın çevresindeki 8 aday konum
+   * denenir, her adayın kapladığı alana düşen rota noktaları (mekânsal indeksle) sayılır.
+   */
+  const tooltipPos = (px: number, py: number) => {
+    const map = mapRef.current, kd = indexRef.current;
+    const W = 230, H = result?.route.hasTime ? 262 : 196, G = 18;
+    const cw = el.current?.clientWidth ?? 800, ch = el.current?.clientHeight ?? 600;
+    const cands: [number, number][] = [
+      [px + G, py - H - G], [px - W - G, py - H - G], [px + G, py + G], [px - W - G, py + G],
+      [px - W / 2, py - H - G * 1.5], [px - W / 2, py + G * 1.5], [px + G * 1.5, py - H / 2], [px - W - G * 1.5, py - H / 2],
+    ];
+    let best = cands[0], bestScore = Infinity, bestK = 0;
+    const scores: number[] = [];
+    cands.forEach(([l, t], k) => {
+      const off = Math.max(0, -l) + Math.max(0, l + W - cw) + Math.max(0, -t) + Math.max(0, t + H - ch);
+      let hits = 0;
+      if (map && kd && off < W) {
+        const a = map.unproject([l - 6, t + H + 6]);
+        const b = map.unproject([l + W + 6, t - 6]);
+        hits = kd.range(Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat)).length;
+      }
+      const score = off * 50 + hits + k * 0.01; // eşitlikte sağ-üst tercih
+      scores[k] = score;
+      if (score < bestScore) { bestScore = score; best = [l, t]; bestK = k; }
+    });
+    // Titremeyi önlemek için önceki konum belirgin biçimde kötüleşmedikçe korunur
+    const prev = lastTip.current;
+    if (prev !== bestK && scores[prev] !== undefined && scores[prev] <= bestScore + 3) { best = cands[prev]; bestK = prev; }
+    lastTip.current = bestK;
+    return { left: Math.min(Math.max(4, best[0]), cw - W - 4), top: Math.min(Math.max(4, best[1]), ch - H - 4) };
+  };
+  const tipPos = hover ? tooltipPos(hover.x, hover.y) : null;
+
   const fit = () => {
     const map = mapRef.current;
     if (!map || !result?.metrics.bbox) return;
@@ -323,7 +358,7 @@ export function MapView({ result, activity, grade, externalCursor, onCursor, sel
     <div className="relative h-full w-full">
       <div ref={el} className="h-full w-full" />
       {result && hover && (
-        <PointTooltip result={result} grade={grade} idx={hover.idx} x={hover.x} y={hover.y} pinned={hover.pinned} activity={activity} onClose={() => setHover(null)} />
+        <PointTooltip result={result} grade={grade} idx={hover.idx} x={tipPos!.left} y={tipPos!.top} pinned={hover.pinned} activity={activity} onClose={() => setHover(null)} />
       )}
       {result && (
         <button onClick={fit} className="ra-mapbtn absolute bottom-[118px] right-[10px]" title="Rotanın tamamını göster">
