@@ -7,8 +7,9 @@ import { fmtTime } from '../src/core/format';
 const sample = 'tests/private/rota1.gpx';
 // Örnek dosya kişisel veridir; depoya girmez. Yoksa bu testler atlanır.
 describe.skipIf(!existsSync(sample))('Rota 1 kabul kontrolleri', () => {
-  const p = parseGpx(readFileSync(sample, 'utf8'), 'rota1.gpx');
-  const { metrics: m, route } = analyze(p, 'car');
+  // Dosya yoksa describe gövdesi yine toplanır; bu yüzden okuma koşullu
+  const p = existsSync(sample) ? parseGpx(readFileSync(sample, 'utf8'), 'rota1.gpx') : (null as any);
+  const { metrics: m, route } = p ? analyze(p, 'car') : ({} as any);
   it('yapı ve üst veri', () => {
     expect(route.lat.length).toBe(2253);
     expect(p.tracks.length).toBe(1);
@@ -38,7 +39,6 @@ describe.skipIf(!existsSync(sample))('Rota 1 kabul kontrolleri', () => {
   it('uydusuz noktalar işaretli', () => {
     expect(m.quality.noSatMovingCount).toBeGreaterThan(0);
   });
-  it('rapor', () => console.log(JSON.stringify({ ...m, quality: m.quality }, null, 1)));
 });
 
 describe('sentetik', () => {
