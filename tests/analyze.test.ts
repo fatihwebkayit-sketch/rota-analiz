@@ -78,3 +78,18 @@ describe('bölüm analizi', () => {
     expect(s.avgSpeedKmh!).toBeCloseTo(36, 0);
   });
 });
+
+import { computeFuel } from '../src/analysis/fuel';
+describe('yakıt hesabı', () => {
+  it('tek yön, gidiş-dönüş, ek masraf ve kişi başı', () => {
+    const f = { consumption: 6.5, price: 45, roundTrip: false, persons: 1, extras: [] };
+    const r = computeFuel(100000, f); // 100 km
+    expect(r.units).toBeCloseTo(6.5, 5);
+    expect(r.fuelCost).toBeCloseTo(292.5, 5);
+    const r2 = computeFuel(100000, { ...f, roundTrip: true, persons: 3, extras: [{ label: 'Köprü', amount: 57.5 }] });
+    expect(r2.distanceKm).toBe(200);
+    expect(r2.total).toBeCloseTo(585 + 57.5, 5);
+    expect(r2.perPerson).toBeCloseTo((585 + 57.5) / 3, 5);
+    expect(r2.perKm).toBeCloseTo((585 + 57.5) / 200, 5);
+  });
+});

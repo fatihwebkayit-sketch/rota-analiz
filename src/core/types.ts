@@ -113,6 +113,49 @@ export interface RouteMetrics {
   quality: QualityReport;
 }
 
+export type FuelType = 'benzin' | 'motorin' | 'lpg' | 'hibrit' | 'elektrik';
+export type Currency = 'TRY' | 'EUR' | 'USD';
+
+export interface Vehicle {
+  id: string;
+  nickname: string;
+  brand: string;
+  model: string;
+  year?: number;
+  fuel: FuelType;
+  avg: number; // L/100 km (elektrikte kWh/100 km)
+  city?: number;
+  highway?: number;
+  tank?: number; // L veya kWh
+  note?: string;
+  isDefault?: boolean;
+  archived?: boolean;
+}
+
+export interface FuelPrice {
+  fuel: FuelType;
+  price: number; // birim fiyat (L veya kWh)
+  currency: Currency;
+  date: number;
+}
+
+export interface ExtraCost { label: string; amount: number }
+
+/** Bir araç rotasının yakıt/masraf varsayımları (hesap anındaki değerlerin anlık görüntüsü). */
+export interface RouteFuel {
+  vehicleId?: string;
+  vehicleLabel?: string;
+  fuel: FuelType;
+  consumption: number; // L/100 km veya kWh/100 km
+  price: number;
+  currency: Currency;
+  roundTrip: boolean;
+  persons: number;
+  extras: ExtraCost[];
+  totalCost?: number; // istatistikler için hesaplanmış toplam
+  computedAt?: number;
+}
+
 export interface SavedSegment {
   id: string;
   name: string;
@@ -142,6 +185,7 @@ export interface RouteRecord {
   };
   autoTrim: boolean;
   segments?: SavedSegment[];
+  fuel?: RouteFuel;
   metrics: RouteMetrics;
   preview: [number, number][]; // basitleştirilmiş [lon, lat] dizisi (liste küçük haritası)
   folderName?: string;

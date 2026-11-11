@@ -12,7 +12,9 @@ const startMs = (r: RouteRecord) => r.metrics.startTime ?? r.createdAt;
 const dayStart = (iso: string) => new Date(iso + 'T00:00:00+03:00').getTime();
 
 export function ArchiveView() {
-  const { records, openRecord, deleteRecord } = useApp();
+  const { records, openRecord, deleteRecord, startCompare } = useApp();
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 4 ? p : [...p, id]));
   const [q, setQ] = useState('');
   const [type, setType] = useState<ActivityType | 'all'>('all');
   const [from, setFrom] = useState('');
@@ -105,6 +107,13 @@ export function ArchiveView() {
             <button className="ra-chip" onClick={() => { setQ(''); setFrom(''); setTo(''); setType('all'); }}>Temizle</button>
           )}
         </div>
+        {picked.length > 0 && (
+          <div className="ml-2 flex items-center gap-2 rounded-[3px] border border-amber/40 bg-amber-soft px-2 py-0.5 text-[11.5px] text-amber">
+            {picked.length} seçili
+            <button className="ra-btn-primary h-6 px-2 text-[11px]" disabled={picked.length < 2} onClick={() => startCompare(picked)}>Karşılaştır</button>
+            <button className="text-fg-muted hover:text-fg" onClick={() => setPicked([])}>Temizle</button>
+          </div>
+        )}
         <span className="ml-auto text-[11.5px] text-fg-muted tnum">{tr.archive.count(rows.length)}</span>
       </div>
 
@@ -112,7 +121,8 @@ export function ArchiveView() {
         <table className="w-full border-collapse text-[12.5px]">
           <thead className="sticky top-0 z-10 bg-ink-900 text-left text-[11px] uppercase tracking-[0.05em] text-fg-faint">
             <tr className="border-b border-ink-700">
-              <th className="w-[72px]" />
+              <th className="w-8" title="Karşılaştırmak için seçin (en fazla 4)" />
+              <th className="w-[64px]" />
               {th('date', tr.archive.cols.date)}
               {th('name', tr.archive.cols.name)}
               <th className="px-3 py-2 font-medium">{tr.archive.cols.type}</th>
@@ -125,7 +135,10 @@ export function ArchiveView() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} onClick={() => openRecord(r.id)} className="group cursor-pointer border-b border-ink-800 hover:bg-ink-850">
-                <td className="py-1.5 pl-3"><RouteThumb pts={r.preview} /></td>
+                <td className="pl-3" onClick={(e) => { e.stopPropagation(); togglePick(r.id); }}>
+                  <input type="checkbox" className="accent-[#f0a03c]" checked={picked.includes(r.id)} onChange={() => togglePick(r.id)} onClick={(e) => e.stopPropagation()} aria-label="Karşılaştırma için seç" />
+                </td>
+                <td className="py-1.5"><RouteThumb pts={r.preview} /></td>
                 <td className="whitespace-nowrap px-3 tnum">
                   <div className="text-fg">{fmtDate(startMs(r))}</div>
                   <div className="text-[11px] text-fg-faint">{fmtTime(r.metrics.startTime)}</div>
@@ -151,13 +164,13 @@ export function ArchiveView() {
               </tr>
             ))}
             {!rows.length && (
-              <tr><td colSpan={8} className="px-3 py-10 text-center text-fg-muted">{tr.archive.noMatch}</td></tr>
+              <tr><td colSpan={9} className="px-3 py-10 text-center text-fg-muted">{tr.archive.noMatch}</td></tr>
             )}
           </tbody>
           {rows.length > 1 && (
             <tfoot className="sticky bottom-0 bg-ink-900 text-[12px]">
               <tr className="border-t border-ink-600">
-                <td />
+                <td colSpan={2} />
                 <td className="px-3 py-2 text-fg-muted" colSpan={3}>{tr.archive.totals}</td>
                 <td className="px-3 text-right tnum">{fmtKm(totals.d)}</td>
                 <td className="px-3 text-right tnum">{fmtDuration(totals.t)}</td>

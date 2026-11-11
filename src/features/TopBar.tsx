@@ -13,7 +13,7 @@ export function TopBar() {
         <span className="text-[13px] font-semibold tracking-tight text-fg">{tr.app.name}</span>
       </div>
       <nav className="flex h-full items-stretch">
-        {(['archive', 'analysis'] as const).map((v) => (
+        {(['archive', 'analysis', 'stats', 'settings'] as const).map((v) => (
           <button
             key={v}
             disabled={v === 'analysis' && !openId}

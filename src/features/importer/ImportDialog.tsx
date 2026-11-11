@@ -6,6 +6,7 @@ import { findDuplicate, newId } from '../../storage/repo';
 import { fmtDateTime } from '../../core/format';
 import { tr } from '../../i18n/tr';
 import { ActivityPicker } from '../../ui/ActivityPicker';
+import { placeNamesFor } from '../../core/geocode';
 
 interface Item {
   key: string;
@@ -23,7 +24,7 @@ interface Item {
 }
 
 export function ImportDialog() {
-  const { importFiles, endImport, records, saveRecord, openRecord, toast } = useApp();
+  const { importFiles, endImport, records, saveRecord, openRecord, toast, prefs, patchRecord } = useApp();
   const [items, setItems] = useState<Item[]>(() =>
     (importFiles ?? []).map((f, i) => ({ key: `${i}-${f.name}`, file: f, status: 'parsing', name: f.name.replace(/\.[^.]+$/, ''), activity: null })),
   );
@@ -57,6 +58,7 @@ export function ImportDialog() {
   async function saveAll() {
     setBusy(true);
     let lastId: string | null = null;
+    const savedRecs: RouteRecord[] = [];
     for (const it of items) {
       if (it.status !== 'ready' || !it.parsed || !it.activity || !it.bytes) continue;
       patch(it.key, { status: 'saving' });
@@ -88,6 +90,7 @@ export function ImportDialog() {
         };
         const saved = await saveRecord(rec, it.bytes);
         lastId = saved.id;
+        savedRecs.push(saved);
         patch(it.key, { status: 'saved' });
       } catch (e) {
         patch(it.key, { status: 'error', error: (e as Error).message });
@@ -99,6 +102,21 @@ export function ImportDialog() {
       toast(saved > 1 ? `${saved} rota kaydedildi` : 'Rota kaydedildi');
       endImport();
       openRecord(lastId);
+      // İsteğe bağlı otomatik yer adı (arka planda, saniyede bir istek)
+      if (prefs.autoPlaceNames) {
+        (async () => {
+          for (const r of savedRecs) {
+            if (!r.metrics.start || !r.metrics.end) continue;
+            try {
+              const n = await placeNamesFor(r.metrics.start, r.metrics.end);
+              await patchRecord(r.id, { startPlace: n.start, endPlace: n.end });
+            } catch {
+              toast('Yer adı alınamadı (internet bağlantısı?). Kayıttaki “Yer adını bul” ile tekrar deneyebilirsiniz.', 'error');
+              break;
+            }
+          }
+        })();
+      }
     }
   }
 

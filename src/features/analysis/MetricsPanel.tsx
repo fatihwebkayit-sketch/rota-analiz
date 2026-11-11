@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ActivityType, RouteRecord } from '../../core/types';
+import type { ActivityType, RouteFuel, RouteRecord } from '../../core/types';
+import { FuelPanel } from './FuelPanel';
+import { placeNamesFor } from '../../core/geocode';
+import { useApp } from '../../state/store';
 import type { AnalysisResult } from '../../workers/protocol';
 import { fmtDateLong, fmtDuration, fmtInt, fmtKm, fmtKmh, fmtM, fmtPace, fmtTime, fmt1, fmtCoord } from '../../core/format';
 import { PROFILES } from '../../analysis/activity';
@@ -15,6 +18,8 @@ interface Props {
   onNotes(notes: string): void;
   onAutoTrim(v: boolean): void;
   top?: ReactNode;
+  onTags(tags: string[]): void;
+  onFuel(f: RouteFuel): void;
 }
 
 /** Odak kaybında kaydeden metin alanı */
@@ -42,7 +47,10 @@ const Stat = ({ label, value, sub, tone }: { label: string; value: string; sub?:
   </div>
 );
 
-export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, onNotes, onAutoTrim, top }: Props) {
+export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, onNotes, onAutoTrim, top, onTags, onFuel }: Props) {
+  const toast = useApp((s) => s.toast);
+  const [finding, setFinding] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
   const m = result?.metrics ?? record.metrics;
   const prof = PROFILES[record.activity];
   const [name, setName] = useDraft(record.name);
@@ -73,9 +81,55 @@ export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, o
           <input className="ra-input" placeholder="Başlangıç yeri" value={sp} onChange={(e) => setSp(e.target.value)} onBlur={() => (sp !== record.startPlace || ep !== record.endPlace) && onPlaces(sp.trim(), ep.trim())} />
           <input className="ra-input" placeholder="Bitiş yeri" value={ep} onChange={(e) => setEp(e.target.value)} onBlur={() => (sp !== record.startPlace || ep !== record.endPlace) && onPlaces(sp.trim(), ep.trim())} />
         </div>
+        <button
+          className="mt-1 text-[11px] text-fg-faint hover:text-fg disabled:opacity-50"
+          disabled={finding || !m.start || !m.end}
+          title="Yalnızca başlangıç ve bitiş koordinatları OpenStreetMap adres servisine gönderilir"
+          onClick={async () => {
+            setFinding(true);
+            try {
+              const n = await placeNamesFor(m.start!, m.end!);
+              onPlaces(n.start, n.end);
+            } catch (e) {
+              toast('Yer adı bulunamadı: ' + (e as Error).message, 'error');
+            } finally {
+              setFinding(false);
+            }
+          }}
+        >
+          {finding ? 'Aranıyor…' : 'Yer adını bul (OpenStreetMap)'}
+        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {record.tags.map((t) => (
+            <span key={t} className="inline-flex h-5 items-center gap-1 rounded-[2px] bg-ink-700 px-1.5 text-[11px] text-fg">
+              {t}
+              <button className="text-fg-faint hover:text-down" onClick={() => onTags(record.tags.filter((x) => x !== t))} aria-label="Etiketi kaldır">×</button>
+            </span>
+          ))}
+          <input
+            className="h-5 min-w-[90px] flex-1 bg-transparent text-[11px] text-fg outline-none placeholder:text-fg-faint"
+            placeholder={record.tags.length ? '+ etiket' : '+ etiket ekle (Enter)'}
+            value={tagDraft}
+            onChange={(e) => setTagDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ',') && tagDraft.trim()) {
+                e.preventDefault();
+                const t = tagDraft.trim().replace(/,$/, '');
+                if (!record.tags.includes(t)) onTags([...record.tags, t]);
+                setTagDraft('');
+              }
+            }}
+          />
+        </div>
       </div>
 
       {top}
+
+      {record.activity === 'car' && (
+        <Section title="Yakıt ve masraf">
+          <FuelPanel record={record} distanceM={m.distanceM} onChange={onFuel} />
+        </Section>
+      )}
 
       <Section title="Rota özeti">
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">

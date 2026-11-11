@@ -3,7 +3,7 @@ import type { ActivityType } from '../core/types';
 
 export const tr = {
   app: { name: 'Rota Analiz' },
-  nav: { archive: 'Arşiv', analysis: 'Analiz' },
+  nav: { archive: 'Arşiv', analysis: 'Analiz', stats: 'İstatistik', settings: 'Araçlar ve Ayarlar', compare: 'Karşılaştırma' },
   activity: {
     car: 'Araç',
     walk: 'Yürüyüş',

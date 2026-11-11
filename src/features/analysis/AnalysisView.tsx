@@ -13,7 +13,7 @@ import { PROFILES } from '../../analysis/activity';
 import { computeSegment, cumulativeClimb, gradeSeries, indexAtDistance, segOfArray } from '../../analysis/segment';
 
 export function AnalysisView() {
-  const { records, openId, folderHandle, folderState, saveRecord, toast } = useApp();
+  const { records, openId, folderHandle, folderState, patchRecord, toast } = useApp();
   const record = useMemo(() => records.find((r) => r.id === openId) ?? null, [records, openId]);
   const [parsed, setParsed] = useState<{ id: string; p: ParsedFile } | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -52,7 +52,7 @@ export function AnalysisView() {
         setResult(res);
         const m = record.metrics;
         if (Math.abs(res.metrics.distanceM - m.distanceM) > 0.5 || res.metrics.trim.startIdx !== m.trim.startIdx || res.metrics.trim.endIdx !== m.trim.endIdx || res.metrics.movingSec !== m.movingSec) {
-          saveRecord({ ...record, metrics: res.metrics, preview: res.preview });
+          patchRecord(record.id, { metrics: res.metrics, preview: res.preview });
         }
       })
       .catch((e) => alive && setError((e as Error).message));
@@ -111,7 +111,7 @@ export function AnalysisView() {
 
   if (!record) return <div className="flex h-full items-center justify-center text-fg-muted">Arşivden bir kayıt seçin.</div>;
 
-  const update = (p: Partial<RouteRecord>) => saveRecord({ ...record, ...p }).catch((e) => toast((e as Error).message, 'error'));
+  const update = (p: Partial<RouteRecord>) => patchRecord(record.id, p).catch((e) => toast((e as Error).message, 'error'));
 
   const saveSegment = (name: string) => {
     if (!selection || selection.b == null) return;
@@ -180,6 +180,8 @@ export function AnalysisView() {
         onPlaces={(startPlace, endPlace) => update({ startPlace, endPlace })}
         onNotes={(notes) => update({ notes })}
         onAutoTrim={(autoTrim) => update({ autoTrim })}
+        onTags={(tags) => update({ tags })}
+        onFuel={(fuel) => update({ fuel })}
         top={
           result && (
             <SegmentPanel

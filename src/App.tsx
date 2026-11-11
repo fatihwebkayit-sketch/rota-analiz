@@ -3,6 +3,9 @@ import { useApp } from './state/store';
 import { TopBar } from './features/TopBar';
 import { ArchiveView } from './features/archive/ArchiveView';
 import { AnalysisView } from './features/analysis/AnalysisView';
+import { StatsView } from './features/stats/StatsView';
+import { SettingsView } from './features/settings/SettingsView';
+import { CompareView } from './features/compare/CompareView';
 import { ImportDialog } from './features/importer/ImportDialog';
 import { FolderSetup } from './features/settings/FolderSetup';
 import { Toasts } from './ui/Toasts';
@@ -53,7 +56,13 @@ export function App() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <main className="relative min-h-0 flex-1">{view === 'archive' ? <ArchiveView /> : <AnalysisView />}</main>
+      <main className="relative min-h-0 flex-1">
+        {view === 'archive' && <ArchiveView />}
+        {view === 'analysis' && <AnalysisView />}
+        {view === 'stats' && <StatsView />}
+        {view === 'settings' && <SettingsView />}
+        {view === 'compare' && <CompareView />}
+      </main>
       {importFiles && <ImportDialog />}
       <FolderSetup />
       <Toasts />

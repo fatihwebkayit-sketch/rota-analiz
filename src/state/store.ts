@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import type { RouteRecord } from '../core/types';
+import type { FuelPrice, RouteRecord, Vehicle } from '../core/types';
+import * as settings from '../storage/settings';
+import type { Prefs } from '../storage/settings';
 import type { FolderState } from '../storage/folder';
 import * as folder from '../storage/folder';
 import * as repo from '../storage/repo';
 import { requestPersistence } from '../storage/db';
 
-export type View = 'archive' | 'analysis';
+export type View = 'archive' | 'analysis' | 'stats' | 'compare' | 'settings';
 export type BaseLayer = 'dark' | 'light' | 'satellite' | 'topo';
 
 interface Toast { id: number; text: string; tone?: 'info' | 'error' }
@@ -22,8 +24,16 @@ interface AppState {
   hillshade: boolean;
   terrain3d: boolean;
   toasts: Toast[];
+  vehicles: Vehicle[];
+  fuelPrices: FuelPrice[];
+  prefs: Prefs;
+  compareIds: string[];
 
   init(): Promise<void>;
+  saveVehicles(items: Vehicle[]): Promise<void>;
+  addFuelPrice(p: FuelPrice): Promise<void>;
+  setPrefs(p: Partial<Prefs>): Promise<void>;
+  startCompare(ids: string[]): void;
   refresh(): Promise<void>;
   openRecord(id: string): void;
   setView(v: View): void;
@@ -35,6 +45,8 @@ interface AppState {
   endImport(): void;
   saveRecord(r: RouteRecord, bytes?: ArrayBuffer): Promise<RouteRecord>;
   deleteRecord(r: RouteRecord): Promise<void>;
+  /** Kaydın en güncel halini okuyup yalnızca verilen alanları değiştirir */
+  patchRecord(id: string, p: Partial<RouteRecord>): Promise<void>;
   setBaseLayer(l: BaseLayer): void;
   toggleHillshade(): void;
   toggleTerrain(): void;
@@ -70,8 +82,14 @@ export const useApp = create<AppState>((set, get) => ({
   hillshade: pref('hillshade', false),
   terrain3d: false,
   toasts: [],
+  vehicles: [],
+  fuelPrices: [],
+  prefs: settings.DEFAULT_PREFS,
+  compareIds: [],
 
   async init() {
+    const local = await settings.loadLocal();
+    set({ vehicles: local.vehicles.items, fuelPrices: local.fuelPrices.items, prefs: { ...settings.DEFAULT_PREFS, ...local.prefs.value } });
     requestPersistence();
     const h = await folder.loadHandle().catch(() => undefined);
     const st = await folder.folderState(h).catch(() => 'none' as FolderState);
@@ -146,6 +164,8 @@ export const useApp = create<AppState>((set, get) => ({
     const h = get().folderHandle;
     if (!h || get().folderState !== 'granted') return;
     try {
+      const st = await settings.syncSettings(h);
+      set({ vehicles: st.vehicles.items, fuelPrices: st.fuelPrices.items, prefs: { ...settings.DEFAULT_PREFS, ...st.prefs.value } });
       const { added } = await repo.syncWithFolder(h);
       await get().refresh();
       if (added && !silent) get().toast(`Klasörden ${added} yeni kayıt alındı`);
@@ -174,12 +194,37 @@ export const useApp = create<AppState>((set, get) => ({
     return rec;
   },
 
+  async patchRecord(id, p) {
+    const r = get().records.find((x) => x.id === id);
+    if (!r) return;
+    await get().saveRecord({ ...r, ...p });
+  },
+
   async deleteRecord(r) {
     const root = get().folderState === 'granted' ? get().folderHandle : undefined;
     await repo.softDelete(r, root);
     if (get().openId === r.id) set({ openId: null, view: 'archive' });
     await get().refresh();
     get().toast(`“${r.name}” çöp kutusuna taşındı (30 gün saklanır)`);
+  },
+
+  async saveVehicles(items) {
+    // Tek varsayılan araç
+    set({ vehicles: items });
+    await settings.saveKey('vehicles', { updatedAt: Date.now(), items }, get().folderState === 'granted' ? get().folderHandle : undefined);
+  },
+  async addFuelPrice(p) {
+    const items = [...get().fuelPrices, p].sort((a, b) => b.date - a.date).slice(0, 200);
+    set({ fuelPrices: items });
+    await settings.saveKey('fuelPrices', { updatedAt: Date.now(), items }, get().folderState === 'granted' ? get().folderHandle : undefined);
+  },
+  async setPrefs(p) {
+    const value = { ...get().prefs, ...p };
+    set({ prefs: value });
+    await settings.saveKey('prefs', { updatedAt: Date.now(), value }, get().folderState === 'granted' ? get().folderHandle : undefined);
+  },
+  startCompare(ids) {
+    set({ compareIds: ids, view: 'compare' });
   },
 
   setBaseLayer(l) {
