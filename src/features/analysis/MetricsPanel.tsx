@@ -81,6 +81,10 @@ export function MetricsPanel({ record, result, onRename, onActivity, onPlaces, o
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M2.5 10.5v3h11v-3" /></svg>
           Rapor oluştur / Dışa aktar (PDF, PNG, GPX…)
         </button>
+        <button className="ra-btn mt-1.5 w-full justify-center" onClick={() => useApp.getState().setAnimOpen(true)}>
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor"><path d="M5 3.5v9l7-4.5z" /></svg>
+          Animasyon / MP4 video
+        </button>
         <div className="mt-2.5 grid grid-cols-2 gap-1.5">
           <input className="ra-input" placeholder="Başlangıç yeri" value={sp} onChange={(e) => setSp(e.target.value)} onBlur={() => (sp !== record.startPlace || ep !== record.endPlace) && onPlaces(sp.trim(), ep.trim())} />
           <input className="ra-input" placeholder="Bitiş yeri" value={ep} onChange={(e) => setEp(e.target.value)} onBlur={() => (sp !== record.startPlace || ep !== record.endPlace) && onPlaces(sp.trim(), ep.trim())} />

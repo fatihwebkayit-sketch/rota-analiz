@@ -29,6 +29,8 @@ interface AppState {
   prefs: Prefs;
   compareIds: string[];
   exportOpen: boolean;
+  animOpen: boolean;
+  setAnimOpen(v: boolean): void;
   updateReady: boolean;
   applyUpdate?: () => void;
   setExportOpen(v: boolean): void;
@@ -91,6 +93,8 @@ export const useApp = create<AppState>((set, get) => ({
   prefs: settings.DEFAULT_PREFS,
   compareIds: [],
   exportOpen: false,
+  animOpen: false,
+  setAnimOpen(v) { set({ animOpen: v }); },
   updateReady: false,
   setExportOpen(v) { set({ exportOpen: v }); },
 

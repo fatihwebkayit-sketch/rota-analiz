@@ -10,11 +10,13 @@ import { ProfileChart } from '../../charts/ProfileChart';
 import { MetricsPanel } from './MetricsPanel';
 import { SegmentPanel } from './SegmentPanel';
 import { ExportDialog } from '../export/ExportDialog';
+import { lazy, Suspense } from 'react';
+const AnimationStudio = lazy(() => import('../animation/AnimationStudio').then((m) => ({ default: m.AnimationStudio })));
 import { PROFILES } from '../../analysis/activity';
 import { computeSegment, cumulativeClimb, gradeSeries, indexAtDistance, segOfArray } from '../../analysis/segment';
 
 export function AnalysisView() {
-  const { records, openId, folderHandle, folderState, patchRecord, toast, exportOpen, setExportOpen, vehicles } = useApp();
+  const { records, openId, folderHandle, folderState, patchRecord, toast, exportOpen, setExportOpen, vehicles, animOpen, setAnimOpen } = useApp();
   const record = useMemo(() => records.find((r) => r.id === openId) ?? null, [records, openId]);
   const [parsed, setParsed] = useState<{ id: string; p: ParsedFile } | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -173,6 +175,14 @@ export function AnalysisView() {
           </div>
         )}
       </div>
+      {animOpen && result && derived && (
+        <Suspense fallback={null}>
+          <AnimationStudio
+            ctx={{ record, result, grade: derived.grade, activity: record.activity, saved: [] }}
+            onClose={() => setAnimOpen(false)}
+          />
+        </Suspense>
+      )}
       {exportOpen && result && derived && (
         <ExportDialog
           ctx={{ record, result, grade: derived.grade, activity: record.activity, saved: savedMetrics.map(({ s, m }) => ({ name: s.name, m })), vehicle: vehicles.find((v) => v.id === record.fuel?.vehicleId) }}

@@ -35,6 +35,6 @@ npm run build    # dist/ klasörüne derleme
 - [x] Aşama 2 — Grafikler, bölüm seçimi (GeoJSON/TCX/FIT ve tırmanış tespiti sonraya)
 - [x] Aşama 3 — Araçlarım, yakıt ve masraf, yer adları, etiketler, istatistik, karşılaştırma, yedekleme
 - [x] Aşama 4 — PDF rapor, PNG paylaşım kartı, CSV/JSON/GPX/.rota, gizlilik seçenekleri
-- [ ] Aşama 5 — Animasyon ve MP4 video
+- [x] Aşama 5 — Animasyon önizleme ve MP4 video (WebCodecs, tarayıcıda)
 
 Harita verileri: © OpenStreetMap katkıda bulunanlar, OpenFreeMap, Esri, OpenTopoMap, AWS Terrain Tiles.
