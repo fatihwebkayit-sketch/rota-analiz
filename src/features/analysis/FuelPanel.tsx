@@ -153,7 +153,9 @@ export function FuelPanel({ record, distanceM, onChange }: { record: RouteRecord
         </div>
         <label className="flex items-center gap-1.5 text-[11.5px] text-fg-muted">
           Kişi
-          <input type="number" min={1} max={20} className="ra-input w-[52px] tnum" value={f.persons} onChange={(e) => commit({ ...f, persons: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) })} />
+          <input type="text" inputMode="numeric" className="ra-input w-[52px] tnum" defaultValue={f.persons} key={`p-${record.id}-${f.persons}`}
+            onBlur={(e) => commit({ ...f, persons: Math.max(1, Math.min(50, parseInt(e.target.value) || 1)) })}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
         </label>
       </div>
 

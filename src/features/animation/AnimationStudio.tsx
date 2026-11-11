@@ -19,6 +19,14 @@ export function AnimationStudio({ ctx, onClose }: { ctx: ExportContext; onClose(
   const [shape, setShape] = useState<Shape>('16:9');
   const [res, setRes] = useState<1080 | 720>(1080);
   const [duration, setDuration] = useState(30);
+  const [durDraft, setDurDraft] = useState('30');
+  useEffect(() => setDurDraft(String(duration)), [duration]);
+  const commitDur = () => {
+    const v = parseInt(durDraft, 10);
+    const ok = isFinite(v) ? Math.min(300, Math.max(5, v)) : duration;
+    setDuration(ok);
+    setDurDraft(String(ok));
+  };
   const [camera, setCamera] = useState<CameraMode>('follow');
   const [style, setStyle] = useState<MapStyleChoice>(ctx.activity === 'walk' || ctx.activity === 'run' || ctx.activity === 'bike' ? 'topo' : 'dark');
   const [hideEnds, setHideEnds] = useState(prefs.hideEndsInExports);
@@ -152,7 +160,26 @@ export function AnimationStudio({ ctx, onClose }: { ctx: ExportContext; onClose(
             <div className="ra-label mb-1.5">Video süresi</div>
             <div className="flex items-center gap-2">
               {seg(duration, [[15, '15 sn'], [30, '30 sn'], [60, '60 sn']], setDuration, exporting)}
-              <input type="number" min={5} max={300} className="ra-input w-[64px] tnum" value={duration} disabled={exporting} onChange={(e) => setDuration(Math.min(300, Math.max(5, +e.target.value || 30)))} />
+              <input
+                type="text"
+                inputMode="numeric"
+                className="ra-input w-[64px] tnum"
+                value={durDraft}
+                disabled={exporting}
+                title="5–300 saniye"
+                // Yazarken serbest; Enter veya kutudan çıkınca 5–300 aralığına uyarlanır
+                onChange={(e) => setDurDraft(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                onBlur={commitDur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitDur();
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const v = Math.min(300, Math.max(5, duration + (e.key === 'ArrowUp' ? 5 : -5)));
+                    setDuration(v);
+                  }
+                }}
+              />
+              <span className="text-[11px] text-fg-faint">sn</span>
             </div>
             <label className="mt-2 flex items-start gap-2">
               <input type="checkbox" className="mt-0.5 accent-[#f0a03c]" checked={compress} disabled={exporting} onChange={(e) => setCompress(e.target.checked)} />
